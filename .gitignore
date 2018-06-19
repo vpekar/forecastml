@@ -1,0 +1,15 @@
+syntax: glob
+
+*.orig
+*.pyc
+*.log
+*.html
+*.hdf5
+
+.spyproject
+cover
+logs
+__pycache__
+
+.coverage
+.noseids
