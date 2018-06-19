@@ -27,7 +27,7 @@ A Python package for running experiments with machine learning regressors on tim
 To run experiments with, e.g., AdaBoost, based on the settings for preprocessing and the learning algorithm specified in `settings.py`:
 
 ```
-python run.py AdaBoost
+$ python run.py AdaBoost
 ```
 
 Evaluation results are written to `results.json` and to a log file under `./logs`.
@@ -36,12 +36,12 @@ Evaluation results are written to `results.json` and to a log file under `./logs
 
 In one console:
 ```
-python run_zmq.py LSTM
+$ python run_zmq.py LSTM
 ```
 
 In a different console, possibly on several different machine(s):
 ```
-python workers_zmq.py LSTM
+$ python workers_zmq.py LSTM
 ```
 
 Evaluation results are written by `run_zmq.py` to `results.json` and to a log file under `./logs`.
@@ -50,7 +50,7 @@ Evaluation results are written by `run_zmq.py` to `results.json` and to a log fi
 **Visualize validation results**
 
 ```
-python validation_runs_viz.py GB
+$ python validation_runs_viz.py GB
 ```
 
 Retrieves validation results from `results.json` for the latest run of the Gradient Boosting regressor and produces plots showing forecast quality measures as a function of hyperparameter values, e.g.:
@@ -60,7 +60,7 @@ Retrieves validation results from `results.json` for the latest run of the Gradi
 **Visualize forecast values**
 
 ```
-python emp_intervals_viz.py GB
+$ python emp_intervals_viz.py GB
 ```
 
 Produces plots with forecast values on the in-sample, validation, and out-of-sample sets. The plots include forecast confidence intervals and "traces" showing forecast values resulting from different random seed values. E.g.:
@@ -88,10 +88,11 @@ Produces plots with forecast values on the in-sample, validation, and out-of-sam
 
 * [keras](https://keras.io/) (optional, required only for using LSTM)
 
-All the packages come installed with [Anaconda](https://conda.io/docs/user-guide/install/download.html), except keras, stldecompose, and xgboost, which can be installed with conda:
+All the packages come installed with [Anaconda](https://conda.io/docs/user-guide/install/download.html), except keras, stldecompose, and xgboost, which can be installed with conda or pip:
 
 ```
-conda install <package name>
+$ pip install stldecompose
+$ conda install -c conda-forge xgboost
 ```
 
 To install keras, follow these [instructions](https://keras.io/#installation).
@@ -100,7 +101,7 @@ To install keras, follow these [instructions](https://keras.io/#installation).
 ## Run tests
 
 ```
-nosetests --with-coverage --cover-html --cover-package="utils,data,learner_configs" tests
+$ nosetests --with-coverage --cover-html --cover-package="utils,data,learner_configs" tests
 ```
 
 
