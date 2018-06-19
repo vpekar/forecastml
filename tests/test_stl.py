@@ -1,7 +1,7 @@
 
 import sys
 import unittest
-from mock import Mock
+from unittest.mock import Mock
 
 import utils
 import data
