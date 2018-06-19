@@ -17,6 +17,7 @@ before_install:
 # Install packages
 install:
   - conda update --yes ipaddress
+  - conda update --yes enum34
   - conda install --yes python=$TRAVIS_PYTHON_VERSION numpy
   - conda install --yes python=$TRAVIS_PYTHON_VERSION nose
   - conda install --yes python=$TRAVIS_PYTHON_VERSION pandas
