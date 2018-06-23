@@ -1,4 +1,4 @@
-
+import os
 import itertools
 import logging
 import warnings
@@ -295,7 +295,8 @@ class ConfigLSTM(Config):
             early_stopping = EarlyStopping(monitor='val_loss',
                 patience=self.early_stopping, verbose=0)
             model_check_point = ModelCheckpoint(
-                filepath="logs/weights.{epoch:02d}-{val_loss:.2f}.hdf5",
+                filepath="logs/%s" % os.getpid() + \
+                    "-weights.{epoch:02d}-{val_loss:.2f}.hdf5",
                 monitor='val_loss', save_best_only=True, verbose=0)
             callbacks = [early_stopping, model_check_point]
             model.fit(trainX, trainY, epochs=self.epochs,
