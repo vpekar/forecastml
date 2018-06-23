@@ -13,7 +13,7 @@ A Python package for running experiments with machine learning regressors on tim
 
 * Multiprocessing with the multiprocessing package
 
-* Distributed processing with zmq
+* Distributed processing with zmq and celery
 
 * Visualization of validation runs
 
@@ -45,6 +45,20 @@ $ python workers_zmq.py LSTM
 ```
 
 Evaluation results are written by `run_zmq.py` to `results.json` and to a log file under `./logs`.
+
+**Celery**
+
+In one console:
+```
+$ python run_celery.py LSTM
+```
+
+In a different console, possibly on several different machine(s):
+```
+$ celery -A workers_celery worker LSTM
+```
+
+Evaluation results are written by `run_celery.py` to `results.json` and to a log file under `./logs`.
 
 
 **Visualize validation results**
@@ -82,17 +96,20 @@ Produces plots with forecast values on the in-sample, validation, and out-of-sam
 
 * zmq (optional, required only for distributed processing)
 
+* celery (optional, required only for distributed processing)
+
 * [stldecompose](https://github.com/jrmontag/STLDecompose) (optional, required only for seasonal decomposition and detrending)
 
-* [xgboost](http://xgboost.readthedocs.io/en/latest/python/python_intro.html) (optional, required only for using XGBoost)
+* [xgboost](http://xgboost.readthedocs.io/en/latest/python/python_intro.html) (optional, required only for XGBoost)
 
-* [keras](https://keras.io/) (optional, required only for using LSTM)
+* [keras](https://keras.io/) (optional, required only for LSTM)
 
-All the packages come installed with [Anaconda](https://conda.io/docs/user-guide/install/download.html), except keras, stldecompose, and xgboost, which can be installed with conda or pip:
+All the packages come installed with [Anaconda](https://conda.io/docs/user-guide/install/download.html), except celery, keras, stldecompose, and xgboost, which can be installed with conda or pip:
 
 ```
-$ pip install stldecompose
+$ conda install -c conda-forge celery
 $ conda install -c conda-forge xgboost
+$ pip install stldecompose
 ```
 
 To install keras, follow these [instructions](https://keras.io/#installation).
