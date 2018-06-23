@@ -1,3 +1,4 @@
+import os
 import logging
 import logging.handlers
 
@@ -14,6 +15,8 @@ def get_logger(name, fname):
     formatter = logging.Formatter(fmt=format)
 
     # file with actual log
+    if fname.startswith("logs") and not os.path.exists("logs"):
+        os.mkdir("logs")
     file_handler = logging.FileHandler(fname, mode="w")
     file_handler.setLevel(logging.DEBUG)
     file_handler.setFormatter(formatter)
