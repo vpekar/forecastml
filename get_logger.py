@@ -29,7 +29,7 @@ def get_logger(name, fname):
     logger.addHandler(stderr_handler)
 
     # file with main results
-    file_handler = logging.FileHandler(fname.replace('.', '-main.'), mode="w")
+    file_handler = logging.FileHandler(fname.replace('.', '-info.'), mode="w")
     file_handler.setLevel(logging.INFO)
     file_handler.setFormatter(formatter)
     logger.addHandler(file_handler)

@@ -1,6 +1,6 @@
 PREPROCESSING = {
-        "data_file": "examples/AirQualityUCI.csv", #"data/3day.1000.w2v.25d.facebook.csv", # 'examples/ise.csv',  # "data/3day.1000.w2v.25d.facebook.csv",
-        "date_format": "%d/%m/%Y %H:%M:%S", #"%Y-%m-%d",# "%d-%b-%y", # "%Y-%m-%d",
+        "data_file": "examples/AirQualityUCI.csv", # 'examples/ise.csv',
+        "date_format": "%d/%m/%Y %H:%M:%S", # "%d-%b-%y",
         "test_split": 0.2,
         "difference": 0,
         "detrend": 0,

@@ -10,6 +10,7 @@ import sys
 import json
 import importlib
 import time
+import logging
 
 from celery import group
 from collections import Counter
@@ -26,16 +27,18 @@ learner = sys.argv[1]
 assert learner in settings.__dict__
 LOGGER = get_logger('main', 'logs/run_celery_%s.log' % learner)
 
+logging.getLogger("matplotlib").disabled = True
+logging.getLogger("amqp").disabled = True
+
 
 def get_val_results(data, learner_config_space, pc):
 
     mse_scores = Counter()
     results = {}
 
-    for response in group(work.s(x) for x in generate_jobs(
+    for result in group(work.s(x) for x in generate_jobs(
                                     learner_config_space, data))().get():
-
-        result = response['result']
+        LOGGER.debug("Got worker result: %s" % result)
         mse_scores[result.config_vals] = result.test_mse
         results[result.config_vals] = result
 
