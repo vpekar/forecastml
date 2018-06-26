@@ -15,6 +15,13 @@ from early_stopping import Monitor
 
 from xgboost import XGBRegressor
 
+from keras import backend
+from keras.models import Sequential
+from keras.layers import Dense, Dropout, Bidirectional  # , Activation
+from keras.layers.recurrent import LSTM
+from keras.callbacks import EarlyStopping, ModelCheckpoint
+from keras.regularizers import L1L2
+
 
 logging.getLogger("tensorflow").disabled = True
 warnings.simplefilter(action='ignore', category=FutureWarning)
@@ -232,16 +239,12 @@ class ConfigLSTM(Config):
         """Importing Keras to be able to use it with multiprocessing
         """
 
-        LOGGER.debug("Training LSTM ...")
+        backend.clear_session()
+
+        LOGGER.debug("Pid: %s: training LSTM ..." % os.getpid())
 
         import numpy as np
         np.random.seed(self.pc['random_state'])
-
-        from keras.models import Sequential
-        from keras.layers import Dense, Dropout, Bidirectional  # , Activation
-        from keras.layers.recurrent import LSTM
-        from keras.callbacks import EarlyStopping, ModelCheckpoint
-        from keras.regularizers import L1L2
 
         model = Sequential()
 
@@ -309,7 +312,7 @@ class ConfigLSTM(Config):
                 # validation_data=(valX, valY))
                 validation_data=(trainX, trainY))
 
-        LOGGER.debug("Trained LSTM.")
+        LOGGER.debug("Pid: %s: trained LSTM." % os.getpid())
 
         return model
 

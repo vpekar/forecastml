@@ -13,6 +13,7 @@ Purge scheduled tasks:
 celery -A workers_celery purge
 """
 
+import sys
 import os
 import celery
 import logging
@@ -25,9 +26,15 @@ app = celery.Celery('workers_celery', broker='amqp://localhost//')
 app.config_from_object('celeryconfig')
 
 logging.getLogger("matplotlib").disabled = True
-logging.getLogger("amqp").disabled = True
 
 
 @app.task
 def work(x):
-    return run_config(x)
+    start = time.time()
+    print("Running config", file=sys.stderr)
+    result = run_config(x)
+    m, s = divmod(time.time()-start, 60)
+    h, m = divmod(m, 60)
+    print("Result: %s, took %d:%02d:%02d" % (result, h, m, s),
+          file=sys.stderr)
+    return result

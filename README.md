@@ -55,7 +55,7 @@ $ python run_celery.py LSTM
 
 In a different console, possibly on several different machine(s):
 ```
-$ celery -A workers_celery worker LSTM
+$ celery -A workers_celery worker
 ```
 
 Evaluation results are written by `run_celery.py` to `results.json` and to a log file under `./logs`.

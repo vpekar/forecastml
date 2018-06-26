@@ -28,7 +28,6 @@ assert learner in settings.__dict__
 LOGGER = get_logger('main', 'logs/run_celery_%s.log' % learner)
 
 logging.getLogger("matplotlib").disabled = True
-logging.getLogger("amqp").disabled = True
 
 
 def get_val_results(data, learner_config_space, pc):
