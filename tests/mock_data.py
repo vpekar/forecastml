@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 
 def get_preproc_config(lags=4, use_exog=False, intent_distance=0,
                        detrend=False, deseason=False, difference=False,
-                       scale=[0, 1], horizon=7):
+                       scale=[0, 1], horizon=7, feature_selection=0):
     adict = {
         "data_file": "infile",
         "date_format": "%Y-%m-%d",
@@ -14,6 +14,7 @@ def get_preproc_config(lags=4, use_exog=False, intent_distance=0,
         "deseason": deseason,
         "seasonal_period": 7,
         "horizon": horizon,
+        "feature_selection": feature_selection,
         "use_exog": use_exog,
         "intent_distance": intent_distance,
         "lags": lags,

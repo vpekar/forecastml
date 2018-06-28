@@ -9,6 +9,8 @@ A Python package for running experiments with machine learning regressors on tim
 
 * Detrending and seasonal decomposition using the STL algorithm
 
+* Informative feature selection
+
 * In-sample and out-of-sample forecast evaluation in terms of RMSE, MAE, MAPE
 
 * Multiprocessing with the multiprocessing package
@@ -118,7 +120,7 @@ To install keras, follow these [instructions](https://keras.io/#installation).
 ## Run tests
 
 ```
-$ nosetests --with-coverage --cover-html --cover-package="utils,data,learner_configs" tests
+$ nosetests --logging-filter=-tensorflow,-matplotlib --with-coverage --cover-html --cover-package="utils,data,learner_configs" tests
 ```
 
 

@@ -44,6 +44,9 @@ for result in test_results:
         dataset in result['preproc_config']['data_file']):
         entry = result
 
+if not entry:
+    raise("Could not find the required entry in the results. Check criteria?")
+
 # build plots for every config parameter
 print("Best config: %s" % entry['best_learner_config'])
 

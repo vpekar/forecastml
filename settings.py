@@ -6,6 +6,7 @@ PREPROCESSING = {
         "detrend": 0,
         "deseason": 0,
         "seasonal_period": 7,
+        "feature_selection": 0, # [0, 1], 0 - no feature selection
         "horizon": 7,
         "use_exog": 1,
         "intent_distance": 0,
@@ -21,7 +22,7 @@ ZMQ = {
 
 GB = {
         "n_estimators": [200, 300, 500, 700, 1000, 1500, 2000],
-        "learning_rate": [0.005, 0.01, 0.02, 0.05, 0.1, 0.2, 0.5],#, 0.75, 1.0, 1.25, 1.5, 2.0, 2.5, 3.0, 5.0],
+        "learning_rate": [0.005, 0.01, 0.02, 0.05, 0.1, 0.2, 0.5],
         "loss": ['ls', 'lad', 'huber', 'quantile'],
         "max_features": [0.05, 0.1, 0.2, 0.6], #["auto", "sqrt", 0.1, 0.7],
         "max_depth": [3, 5, 10],
@@ -72,11 +73,11 @@ LSTM = {
         "topology": [(7, 3, 1)], #, (25, 25, 1)],#, (7, 14, 1)],
         "epochs": [2000],#, 5000],#, 3000],
         "batch_size": [2],#, 10],#, 5, 10],
-        "activation": ["sigmoid", "relu", "tanh", "softmax"],#, softmax, relu, sigmoid, tanh, None
+        "activation": ["sigmoid", "relu", "tanh", "softmax"],#, None
         "dropout_rate": [0],#, 0.2, 0.4],# [0, 0.2, 0.4],
         "optimizer": ["adam"], # sgd, rmsprop, adagrad, adadelta, adamax, nadam
-        "kernel_regularizer": [(0.0, 0.0)],#, (0.01, 0.0), (0.0, 0.01), (0.01, 0.01)], # (0.0, 0.01), (0.01, 0.01)
-        "bias_regularization": [(0.0, 0.0)],#, (0.01, 0.0), (0.0, 0.01), (0.01, 0.01)], # (0.0, 0.01), (0.01, 0.01)
+        "kernel_regularizer": [(0.0, 0.0)],#, (0.01, 0.0), (0.0, 0.01), (0.01, 0.01)],
+        "bias_regularization": [(0.0, 0.0)],#, (0.01, 0.0), (0.0, 0.01), (0.01, 0.01)],
         "early_stopping": [3],#, 5],#, 2, 3],
         "stateful": [False] # True
         }

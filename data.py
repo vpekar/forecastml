@@ -4,8 +4,10 @@ import pandas as pd
 import stldecompose
 
 from copy import deepcopy
+from collections import Counter
 
 from sklearn.preprocessing import MinMaxScaler
+from sklearn.feature_selection import f_regression
 
 
 LOGGER = logging.getLogger('main.data')
@@ -36,11 +38,6 @@ class Data:
 
         self.stl_forecast = {}
 
-        # feature_names
-        self.exog_names = deepcopy(df.columns).tolist()
-        self.exog_names.remove('dep_var')
-        self.feature_names = []
-
         # train, validation and test positions in the dataset
         test_size = int((df.shape[0] + self.lags) * self.test_split)
         self.train_start = self.lags
@@ -50,10 +47,18 @@ class Data:
         self.test_start = self.val_end + self.lags
         self.test_end = df.shape[0]
 
+        if config['feature_selection'] != 0:
+            df = self.select_features(df, config['feature_selection'])
+
         # set original level Y's
         self.trainYref = self.y_orig[self.train_start:self.train_end]
         self.valYref = self.y_orig[self.val_start:self.val_end]
         self.testYref = self.y_orig[self.test_start:self.test_end]
+
+        # feature_names
+        self.exog_names = deepcopy(df.columns).tolist()
+        self.exog_names.remove('dep_var')
+        self.feature_names = []
 
         # data
         self.trainX = None
@@ -76,6 +81,33 @@ class Data:
         return "trainX %s, trainY %s, valX %s, valY %s, testX %s, testY %s" % (
             self.trainX.shape, self.trainY.shape, self.valX.shape,
             self.valY.shape, self.testX.shape, self.testY.shape)
+
+    def select_features(self, df, ratio):
+        """Select the most informative features
+        :param df: input dataframe
+        :param ratio: the number of features to select ([0, 1])
+        """
+        x_columns = df.columns[:-1]
+        num_sel = int((len(x_columns)) * ratio)
+        if num_sel == 0:
+            raise Exception("The feature_selection setting will remove "+
+                            "all features, review settings.py")
+
+        LOGGER.debug("Will select %d features" % num_sel)
+        scores = f_regression(df.values[:, :-1], df.values[:, -1], False)[0]
+        selected = Counter(dict(zip(x_columns, scores))).most_common(num_sel)
+
+        LOGGER.info("Selected features:")
+        for feature, score in selected:
+            LOGGER.info("%s\t%.6f" % (feature, score))
+
+        # delete de-selected columns
+        selected_names = [x for x, y in selected]
+        for col in x_columns:
+            if col not in selected_names:
+                del df[col]
+
+        return df
 
     def scale(self):
 
