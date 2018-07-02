@@ -1,7 +1,7 @@
 
 import sys
 import unittest
-from unittest.mock import Mock
+from mock import Mock
 
 import utils
 import data
@@ -35,25 +35,25 @@ class TestDecompose2d(unittest.TestCase):
         data.Data2d.revert = Mock(side_effect=lambda x: x)
 
     def test_decompose_is(self):
-        c = get_preproc_config(lags=3, detrend=True, deseason=True)
+        c = get_preproc_config(lags=3, detrend=True, deseason=True, horizon=1)
         d = prepare_data(c)
         # assert that stl forecast is the same shape as original trainY
-        self.assertEqual(d.stl_forecast['train'].shape, (21,1))
+        self.assertEqual(d.stl_forecast['train'].shape, (21-c['horizon']+1, 1))
         # assert that the new data.trainY is the same shape as original trainY
         self.assertEqual(d.trainY.shape, (21,))
 
     def test_decompose_val(self):
-        c = get_preproc_config(lags=3, detrend=True, deseason=True)
+        c = get_preproc_config(lags=3, detrend=True, deseason=True, horizon=1)
         d = prepare_data(c)
-        self.assertEqual(d.stl_forecast['val'].shape, (5,1))
+        self.assertEqual(d.stl_forecast['val'].shape, (5-c['horizon']+1, 1))
 
     def test_decompose_oos(self):
-        c = get_preproc_config(lags=3, detrend=True, deseason=True)
+        c = get_preproc_config(lags=3, detrend=True, deseason=True, horizon=1)
         d = prepare_data(c)
-        self.assertEqual(d.stl_forecast['test'].shape, (5,1))
+        self.assertEqual(d.stl_forecast['test'].shape, (5-c['horizon']+1, 1))
 
     def test_revert_decompose__train(self):
-        c = get_preproc_config(lags=3, detrend=True, deseason=True)
+        c = get_preproc_config(lags=3, detrend=True, deseason=True, horizon=1)
         d = prepare_data(c)
         # assert that the data was decomposed and forecast + resid is
         # equal to ref
@@ -63,7 +63,7 @@ class TestDecompose2d(unittest.TestCase):
                          d.trainYref[-1])
 
     def test_revert_decompose__val(self):
-        c = get_preproc_config(lags=3, detrend=True, deseason=True)
+        c = get_preproc_config(lags=3, detrend=True, deseason=True, horizon=1)
         d = prepare_data(c)
         # assert that the data was decomposed and forecast + resid is
         # equal to ref
@@ -71,7 +71,7 @@ class TestDecompose2d(unittest.TestCase):
         self.assertEqual(d.valY[-1] + d.stl_forecast['val'][-1], d.valYref[-1])
 
     def test_revert_decompose__test(self):
-        c = get_preproc_config(lags=3, detrend=True, deseason=True)
+        c = get_preproc_config(lags=3, detrend=True, deseason=True, horizon=1)
         d = prepare_data(c)
         # assert that the data was decomposed and forecast + resid is
         # equal to ref
@@ -96,25 +96,25 @@ class TestDecompose3d(unittest.TestCase):
         data.Data3d.revert = Mock(side_effect=lambda x: x)
 
     def test_decompose_is(self):
-        c = get_preproc_config(lags=3, detrend=True, deseason=True)
+        c = get_preproc_config(lags=3, detrend=True, deseason=True, horizon=1)
         d = prepare_data(c, dim="3d")
         # assert that stl forecast is the same shape as original trainY
-        self.assertEqual(d.stl_forecast['train'].shape, (21,1))
+        self.assertEqual(d.stl_forecast['train'].shape, (21-c['horizon']+1,1))
         # assert that the new data.trainY is the same shape as original trainY
         self.assertEqual(d.trainY.shape, (21,))
 
     def test_decompose_val(self):
-        c = get_preproc_config(lags=3, detrend=True, deseason=True)
+        c = get_preproc_config(lags=3, detrend=True, deseason=True, horizon=1)
         d = prepare_data(c, dim="3d")
-        self.assertEqual(d.stl_forecast['val'].shape, (5,1))
+        self.assertEqual(d.stl_forecast['val'].shape, (5-c['horizon']+1, 1))
 
     def test_decompose_oos(self):
-        c = get_preproc_config(lags=3, detrend=True, deseason=True)
+        c = get_preproc_config(lags=3, detrend=True, deseason=True, horizon=1)
         d = prepare_data(c, dim="3d")
-        self.assertEqual(d.stl_forecast['test'].shape, (5,1))
+        self.assertEqual(d.stl_forecast['test'].shape, (5-c['horizon']+1, 1))
 
     def test_revert_decompose__train(self):
-        c = get_preproc_config(lags=3, detrend=True, deseason=True)
+        c = get_preproc_config(lags=3, detrend=True, deseason=True, horizon=1)
         d = prepare_data(c, dim="3d")
         # assert that the data was decomposed and forecast + resid is equal to
         # ref
@@ -124,7 +124,7 @@ class TestDecompose3d(unittest.TestCase):
                                d.trainYref[-1], delta=0.9)
 
     def test_revert_decompose__val(self):
-        c = get_preproc_config(lags=3, detrend=True, deseason=True)
+        c = get_preproc_config(lags=3, detrend=True, deseason=True, horizon=1)
         d = prepare_data(c, dim="3d")
         # assert that the data was decomposed and forecast + resid is
         # equal to ref
@@ -134,7 +134,7 @@ class TestDecompose3d(unittest.TestCase):
                                d.valYref[-1], delta=0.9)
 
     def test_revert_decompose__test(self):
-        c = get_preproc_config(lags=3, detrend=True, deseason=True)
+        c = get_preproc_config(lags=3, detrend=True, deseason=True, horizon=1)
         d = prepare_data(c, dim="3d")
         # assert that the data was decomposed and forecast + resid is
         # equal to ref

@@ -1,5 +1,5 @@
 import unittest
-from unittest.mock import Mock
+from mock import Mock
 
 import utils
 import data
@@ -51,11 +51,11 @@ class TestUtils3d(unittest.TestCase):
         data.Data3d.revert = Mock(side_effect=lambda x: x)
 
     def test_Yref(self):
-        c = get_preproc_config(lags=3)
+        c = get_preproc_config(lags=3, horizon=1)
         d = prepare_data(c, dim="3d")
-        self.assertEqual(d.trainY[0], d.trainYref[0])
-        self.assertEqual(d.valY[0], d.valYref[0])
-        self.assertEqual(d.testY[0], d.testYref[0])
+        self.assertEqual(d.trainY[c['horizon']-1], d.trainYref[0])
+        self.assertEqual(d.valY[c['horizon']-1], d.valYref[0])
+        self.assertEqual(d.testY[c['horizon']-1], d.testYref[0])
 
     def test_get_data__no_exog(self):
         c = get_preproc_config(lags=3)
@@ -117,11 +117,11 @@ class TestUtils2d(unittest.TestCase):
         data.Data2d.revert = Mock(side_effect=lambda x: x)
 
     def test_Yref(self):
-        c = get_preproc_config(lags=3)
+        c = get_preproc_config(lags=3, horizon=1)
         d = prepare_data(c)
-        self.assertEqual(d.trainYref[0], d.trainY[0])
-        self.assertEqual(d.valY[0], d.valYref[0])
-        self.assertEqual(d.testY[0], d.testYref[0])
+        self.assertEqual(d.trainY[c['horizon']-1], d.trainYref[0])
+        self.assertEqual(d.valY[c['horizon']-1], d.valYref[0])
+        self.assertEqual(d.testY[c['horizon']-1], d.testYref[0])
 
     def test_get_data__no_exog(self):
         c = get_preproc_config(lags=3)

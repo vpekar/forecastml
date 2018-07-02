@@ -1,5 +1,5 @@
 import unittest
-from unittest.mock import Mock
+from mock import Mock
 
 import utils
 import data
@@ -22,7 +22,7 @@ class TestScaling2d(unittest.TestCase):
 
     def test_scaleY(self):
         # ensure scaling works
-        c = get_preproc_config(use_exog=True)
+        c = get_preproc_config(use_exog=True, horizon=1)
         d = prepare_data(c)
 
         # train
@@ -30,21 +30,22 @@ class TestScaling2d(unittest.TestCase):
         self.assertEqual(1.0, d.trainY[-1])
 
         # val
-        self.assertTrue(d.valY[0] != d.valYref[0])
+        self.assertTrue(d.valY[c['horizon']-1] != d.valYref[0])
         self.assertTrue(d.valY[-1] != d.valYref[-1])
 
         # test
-        self.assertTrue(d.testY[0] != d.testYref[0])
+        self.assertTrue(d.testY[c['horizon']-1] != d.testYref[0])
         self.assertTrue(d.testY[-1] != d.testYref[-1])
 
     def test_scale_revert(self):
         c = get_preproc_config(use_exog=True)
         d = prepare_data(c)
-        self.assertTrue(d.revert(d.trainY)[5], d.trainYref[5])
+        self.assertAlmostEqual(d.revert(d.trainY)[5+c['horizon']-1],
+                               d.trainYref[5], delta=0.9)
 
     def test_scaleYref(self):
         # assert original Y's are not changed after scaling
-        c = get_preproc_config(use_exog=True)
+        c = get_preproc_config(use_exog=True, horizon=1)
         d = prepare_data(c)
         self.assertEqual(52.0, d.trainYref[0])
         self.assertEqual(242.0, d.trainYref[-1])
@@ -77,7 +78,7 @@ class TestScaling3d(unittest.TestCase):
 
     def test_scaleY(self):
         # ensure scaling works
-        c = get_preproc_config(use_exog=True)
+        c = get_preproc_config(use_exog=True, horizon=1)
         d = prepare_data(c)
         d = prepare_data(c, dim="3d")
 
@@ -101,7 +102,7 @@ class TestScaling3d(unittest.TestCase):
 
     def test_scaleYref(self):
         # assert original Y's are not changed after scaling
-        c = get_preproc_config(use_exog=True)
+        c = get_preproc_config(use_exog=True, horizon=1)
         d = prepare_data(c)
         d = prepare_data(c, dim="3d")
         self.assertEqual(52.0, d.trainYref[0])

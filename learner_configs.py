@@ -1,3 +1,4 @@
+
 import os
 import itertools
 import logging
@@ -15,12 +16,11 @@ from early_stopping import Monitor
 
 from xgboost import XGBRegressor
 
+from keras import models
+from keras import layers
+from keras import callbacks
+from keras import regularizers
 from keras import backend
-from keras.models import Sequential
-from keras.layers import Dense, Dropout, Bidirectional  # , Activation
-from keras.layers.recurrent import LSTM
-from keras.callbacks import EarlyStopping, ModelCheckpoint
-from keras.regularizers import L1L2
 
 
 logging.getLogger("tensorflow").disabled = True
@@ -54,7 +54,7 @@ class ConfigSpace:
             adict = dict(zip(param_names, x))
             yield self.Config(adict, self.pc)
             i += 1
-            if i % 100 == 0:
+            if i % 10 == 0:
                 try:
                     LOGGER.info("%s: completed %d of %d" % (datetime.now(), i,
                                                             self.num_configs))
@@ -81,43 +81,37 @@ class Config:
         return self.name
 
     def forecast(self, model, testX):
-        """Given a model, the first test instance, and the number of future
-        steps to forecast, output a list with predictions, such that earlier
-        predictions are used as input for later predictions.
-        :param horizon: the number of steps ahead to forecast
+        """Return forecasts for all horizons up to `horizon`
         """
-        lags = self.pc['lags']
+
+        results = []
         horizon = self.pc['horizon']
-        result = []
-        x = 0
-        h = 0
-        steps = len(testX)
+        lags = self.pc['lags']
 
-        while x < steps:
+        for i in range(len(testX) - horizon + 1):
+            for j in range(horizon):
+                instance = testX[i+j]
+                if j == 0:
+                    buf = []
+                else:
+                    # insert the buffer into instance
+                    buf_len = len(buf)
+                    start = lags - buf_len
+                    end = start + buf_len
+                    instance = np.concatenate((instance[:start], buf,
+                                               instance[end:]))
 
-            if h == horizon + 1 or x == 0:
-                instance = testX[x].reshape(1, -1)
-                buf = testX[x].tolist()[:lags]
-                h = 0
-            else:
-                instance = np.array([np.concatenate(
-                        [np.array(buf), testX[x][lags:]])])
+                pred_val = model.predict(instance.reshape(1, -1))[0]
+                if np.isnan(pred_val) or pred_val < -1.0 or pred_val > 1.0:
+                    warnings.warn("Error forecasting %s, returning 0.5"
+                                  % instance)
+                    pred_val = 0.5
+                buf.append(pred_val)
+                LOGGER.debug("Predicting with instance %s, result %s" %
+                      (instance, pred_val))
+            results.append(pred_val)
 
-            prediction = model.predict(instance)[0]
-            pred_val = prediction
-
-            if np.isnan(pred_val) or pred_val < -1.0 or pred_val > 1.0:
-                warnings.warn("Error forecasting %s, setting forecast to 0.5"
-                              % instance)
-                pred_val = 0.5
-
-            result.append(pred_val)
-            buf.pop(0)
-            buf.insert(lags-1, pred_val)
-            x += 1
-            h += 1
-
-        return np.array(result)
+        return np.array(results).reshape(-1, 1)
 
 
 class ConfigSVR(Config):
@@ -243,51 +237,52 @@ class ConfigLSTM(Config):
 
         LOGGER.debug("Pid: %s: training LSTM ..." % os.getpid())
 
-        import numpy as np
         np.random.seed(self.pc['random_state'])
 
-        model = Sequential()
+        model = models.Sequential()
 
-        kernel_regularizer = L1L2(l1=self.kernel_regularizer[0],
+        kernel_regularizer = regularizers.L1L2(l1=self.kernel_regularizer[0],
                            l2=self.kernel_regularizer[1])
-        bias_regularizer = L1L2(l1=self.bias_regularization[0],
+        bias_regularizer = regularizers.L1L2(l1=self.bias_regularization[0],
                            l2=self.bias_regularization[1])
 
         return_sequences_on_input = False if len(self.topology) == 2 else True
 
         # first layer
         if self.bidirectional:
-            model.add(Bidirectional(LSTM(units=self.topology[0],
-                           activation=self.activation,
-                           return_sequences=return_sequences_on_input,
-                           kernel_regularizer=kernel_regularizer,
-                           bias_regularizer=bias_regularizer),
-                           input_shape=(None, trainX.shape[2]),))
+            model.add(layers.Bidirectional(layers.LSTM(
+                      units=self.topology[0],
+                      activation=self.activation,
+                      return_sequences=return_sequences_on_input,
+                      kernel_regularizer=kernel_regularizer,
+                      bias_regularizer=bias_regularizer),
+                      input_shape=(None, trainX.shape[2]),))
         else:
-            model.add(LSTM(input_shape=(None, trainX.shape[2]),
-                   units=self.topology[0],
-                   activation=self.activation,
-                   return_sequences=return_sequences_on_input,
-                   kernel_regularizer=kernel_regularizer,
-                   bias_regularizer=bias_regularizer))
+            model.add(layers.LSTM(input_shape=(None, trainX.shape[2]),
+                    units=self.topology[0],
+                    activation=self.activation,
+                    return_sequences=return_sequences_on_input,
+                    kernel_regularizer=kernel_regularizer,
+                    bias_regularizer=bias_regularizer))
 
         if self.dropout_rate:
-            model.add(Dropout(self.dropout_rate))
+            model.add(layers.Dropout(self.dropout_rate))
 
         # other layers
         for n_layer in self.topology[1:-1]:
             if self.bidirectional:
-                model.add(Bidirectional(LSTM(n_layer, return_sequences=False,
-                           kernel_regularizer=kernel_regularizer,
-                           bias_regularizer=bias_regularizer)))
+                model.add(layers.Bidirectional(layers.LSTM(
+                                    n_layer, return_sequences=False,
+                                    kernel_regularizer=kernel_regularizer,
+                                    bias_regularizer=bias_regularizer)))
             else:
-                model.add(LSTM(n_layer, return_sequences=False,
-                           kernel_regularizer=kernel_regularizer,
-                           bias_regularizer=bias_regularizer))
+                model.add(layers.LSTM(n_layer, return_sequences=False,
+                            kernel_regularizer=kernel_regularizer,
+                            bias_regularizer=bias_regularizer))
             if self.dropout_rate:
-                model.add(Dropout(self.dropout_rate))
+                model.add(layers.Dropout(self.dropout_rate))
 
-        model.add(Dense(units=self.topology[-1]))
+        model.add(layers.Dense(units=self.topology[-1]))
 
         model.compile(loss="mean_squared_error", optimizer=self.optimizer)
 
@@ -295,17 +290,17 @@ class ConfigLSTM(Config):
         if self.early_stopping:
             # early stopping: Keras to stop training when loss didn't improve
             # for `c.early_stopping` epochs
-            early_stopping = EarlyStopping(monitor='val_loss',
+            early_stopping = callbacks.EarlyStopping(monitor='val_loss',
                 patience=self.early_stopping, verbose=0)
-            model_check_point = ModelCheckpoint(
+            model_check_point = callbacks.ModelCheckpoint(
                 filepath="logs/%s" % os.getpid() + \
                     "-weights.{epoch:02d}-{val_loss:.2f}.hdf5",
                 monitor='val_loss', save_best_only=True, verbose=0)
-            callbacks = [early_stopping, model_check_point]
             model.fit(trainX, trainY, epochs=self.epochs,
                 batch_size=self.batch_size, verbose=0,
                 # validation_data=(valX, valY), callbacks=callbacks)
-                validation_data=(trainX, trainY), callbacks=callbacks)
+                validation_data=(trainX, trainY),
+                                 callbacks=[early_stopping, model_check_point])
         else:
             model.fit(trainX, trainY, epochs=self.epochs,
                 batch_size=self.batch_size, verbose=0,
@@ -317,32 +312,29 @@ class ConfigLSTM(Config):
         return model
 
     def forecast(self, model, testX):
-        """Given a Keras model, the first test instance, and the number of
-        future steps to forecast, output a list with predictions, such that
-        earlier redictions are used as input for later predictions.
+        """Return forecasts for all horizons up to `horizon`
         """
+        results = []
         lags = self.pc['lags']
         horizon = self.pc['horizon']
-        result = []
-        x = 0
-        h = 0
-        steps = len(testX)
 
-        while x < steps:
+        for i in range(len(testX) - horizon + 1):
+            for j in range(horizon):
+                if j == 0:
+                    buf = []
+                    instance = testX[i+j]
+                else:
+                    # insert the buffer into instance
+                    buf_len = len(buf)
+                    if buf_len > lags:
+                        buf = buf[-lags:]
+                        buf_len = lags
+                    instance = deepcopy(testX[i+j])
+                    instance[-buf_len:, -1] = np.array(buf)
+                pred_val = model.predict(instance[np.newaxis, :, :])[0][0]
+                buf.append(pred_val)
+                LOGGER.debug("Predicting with instance %s, result %s" %
+                             (instance, pred_val))
+            results.append(pred_val)
 
-            instance = deepcopy(testX[x])
-            if h == horizon + 1 or x == 0:
-                h = 0
-                buf = testX[x][:, -1].tolist()
-            else:
-                instance[:, -1] = buf
-            instance = np.array([instance])
-
-            pred_val = model.predict(instance)[0][0]
-            result.append(pred_val)
-            buf.pop(0)
-            buf.insert(lags-1, pred_val)
-            x += 1
-            h += 1
-
-        return np.array(result)#.flatten()
+        return np.array(results).reshape(-1, 1)

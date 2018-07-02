@@ -88,26 +88,26 @@ def run_config(args):
                   feature_scores)
 
 
-def get_mse(data, yhat, mode="train", y=None):
+def get_mse(data, yhat, mode="train"):
     """Root Mean Squared Error
     """
-    y = getattr(data, mode + "Yref") if y is None else y
+    y = getattr(data, mode + "Yref")
     mse = mean_squared_error(y, data.revert(yhat, mode))
     return np.sqrt(mse)
 
 
-def get_mae(data, yhat, mode="train", y=None):
+def get_mae(data, yhat, mode="train"):
     """Mean Absolute Error
     """
-    y = getattr(data, mode + "Yref") if y is None else y
+    y = getattr(data, mode + "Yref")
     mae = mean_absolute_error(y, data.revert(yhat, mode))
     return mae
 
 
-def get_mape(data, yhat, mode="train", y=None):
+def get_mape(data, yhat, mode="train"):
     """Mean Absolute Percentage Error
     """
-    y = getattr(data, mode + "Yref") if y is None else y
+    y = getattr(data, mode + "Yref")
     y_flat = y.values.reshape((-1,))
     yhat_flat = data.revert(yhat, mode).flatten()
     return np.mean(np.abs((y_flat - yhat_flat) / y_flat)) * 100

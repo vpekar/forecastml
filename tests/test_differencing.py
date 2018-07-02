@@ -1,5 +1,5 @@
 import unittest
-from unittest.mock import Mock
+from mock import Mock
 
 import utils
 import data
@@ -23,7 +23,7 @@ class TestDifferencing2d(unittest.TestCase):
 
     def test_get_data__do_difference(self):
         # ensure differencing works
-        c = get_preproc_config(difference=True)
+        c = get_preproc_config(difference=True, horizon=1)
         d = prepare_data(c)
 
         # train
@@ -40,7 +40,7 @@ class TestDifferencing2d(unittest.TestCase):
 
     def test_get_data__revert_difference_train(self):
         # ensure trainY are restored to previous values
-        c = get_preproc_config(difference=True, scale=[0., 0.])
+        c = get_preproc_config(difference=True, scale=[0., 0.], horizon=1)
         d = prepare_data(c)
         reverted = d.revert(d.trainY)
         self.assertEqual(d.trainYref[0], reverted[0])
@@ -49,7 +49,7 @@ class TestDifferencing2d(unittest.TestCase):
 
     def test_get_data__revert_difference_val(self):
         # ensure valY are restored to previous values
-        c = get_preproc_config(difference=True, scale=[0., 0.])
+        c = get_preproc_config(difference=True, scale=[0., 0.], horizon=1)
         d = prepare_data(c)
         reverted = d.revert(d.valY, "val")
         self.assertEqual(d.valYref[0], reverted[0])
@@ -58,7 +58,7 @@ class TestDifferencing2d(unittest.TestCase):
 
     def test_get_data__revert_difference_test(self):
         # ensure testY are restored to previous values
-        c = get_preproc_config(difference=True, scale=[0., 0.])
+        c = get_preproc_config(difference=True, scale=[0., 0.], horizon=1)
         d = prepare_data(c)
         reverted = d.revert(d.testY, "test")
         self.assertEqual(d.testYref[0], reverted[0])
@@ -82,7 +82,7 @@ class TestDifferencing3d(unittest.TestCase):
 
     def test_get_data__do_difference(self):
         # ensure differencing works
-        c = get_preproc_config(difference=True)
+        c = get_preproc_config(difference=True, horizon=1)
         d = prepare_data(c, dim="3d")
 
         # train
@@ -99,7 +99,7 @@ class TestDifferencing3d(unittest.TestCase):
 
     def test_get_data__revert_difference_train(self):
         # ensure trainY are restored to previous values
-        c = get_preproc_config(difference=True, scale=[0., 0.])
+        c = get_preproc_config(difference=True, scale=[0., 0.], horizon=1)
         d = prepare_data(c, dim="3d")
 
         reverted = d.revert(d.trainY)
@@ -109,7 +109,7 @@ class TestDifferencing3d(unittest.TestCase):
 
     def test_get_data__revert_difference_val(self):
         # ensure valY are restored to previous values
-        c = get_preproc_config(difference=True, scale=[0., 0.])
+        c = get_preproc_config(difference=True, scale=[0., 0.], horizon=1)
         d = prepare_data(c, dim="3d")
         reverted = d.revert(d.valY, "val")
         self.assertEqual(d.valYref[0], reverted[0])
@@ -118,7 +118,7 @@ class TestDifferencing3d(unittest.TestCase):
 
     def test_get_data__revert_difference_test(self):
         # ensure testY are restored to previous values
-        c = get_preproc_config(difference=True, scale=[0., 0.])
+        c = get_preproc_config(difference=True, scale=[0., 0.], horizon=1)
         d = prepare_data(c, dim="3d")
         reverted = d.revert(d.testY, "test")
         self.assertEqual(d.testYref[0], reverted[0])

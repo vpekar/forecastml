@@ -27,6 +27,7 @@ class Data:
         self.lags = config['lags']
         self.test_split = config['test_split']
         self.intent_distance = config['intent_distance']
+        self.horizon = config['horizon']
         self.y_scaler = None
         if config['scale_range'][0] != 0 or config['scale_range'][1] != 0:
             self.y_scaler = MinMaxScaler(feature_range=config['scale_range'])
@@ -51,9 +52,9 @@ class Data:
             df = self.select_features(df, config['feature_selection'])
 
         # set original level Y's
-        self.trainYref = self.y_orig[self.train_start:self.train_end]
-        self.valYref = self.y_orig[self.val_start:self.val_end]
-        self.testYref = self.y_orig[self.test_start:self.test_end]
+        self.trainYref = self.y_orig[self.train_start+self.horizon-1:self.train_end]
+        self.valYref = self.y_orig[self.val_start+self.horizon-1:self.val_end]
+        self.testYref = self.y_orig[self.test_start+self.horizon-1:self.test_end]
 
         # feature_names
         self.exog_names = deepcopy(df.columns).tolist()
@@ -158,7 +159,8 @@ class Data:
             extract = stl.trend
             resid = stl.resid + stl.seasonal
         self.stl_forecast['train'] = \
-            extract[self.train_start:].values.astype('float32').reshape(-1, 1)
+            extract[self.train_start+self.horizon-1:].values.\
+            astype('float32').reshape(-1, 1)
         endog_train = resid.values.astype('float32').reshape(-1, 1)
         return endog_train
 
@@ -167,7 +169,7 @@ class Data:
         start = self.train_end
         end = self.val_end
         endog_val, forecast = self._decompose(start, end)
-        self.stl_forecast['val'] = forecast[self.lags:]
+        self.stl_forecast['val'] = forecast[self.lags+self.horizon-1:]
         return endog_val
 
     def decompose_oos(self):
@@ -176,7 +178,7 @@ class Data:
         start = self.val_end
         end = self.test_end
         endog_test, forecast = self._decompose(start, end)
-        self.stl_forecast['test'] = forecast[self.lags:]
+        self.stl_forecast['test'] = forecast[self.lags+self.horizon-1:]
         return endog_test
 
     def decompose(self):

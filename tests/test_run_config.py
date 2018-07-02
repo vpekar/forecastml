@@ -51,7 +51,7 @@ class TestRunConfig(TestCase):
         utils.pd.read_csv = Mock(return_value=get_df())
 
     def test_2d_test_mode(self):
-        pc = get_preproc_config(lags=3)
+        pc = get_preproc_config(lags=3, horizon=1)
         d = prepare_data(pc)
         mockConfigSVR = get_mock_svr(d)
 
@@ -66,7 +66,7 @@ class TestRunConfig(TestCase):
         self.assertTrue(r.yhat_oos[0] <= 1.0)
 
     def test_2d_val_mode(self):
-        pc = get_preproc_config(lags=3)
+        pc = get_preproc_config(lags=3, horizon=1)
         d = prepare_data(pc)
         mockConfigSVR = get_mock_svr(d)
 
@@ -81,7 +81,7 @@ class TestRunConfig(TestCase):
         self.assertTrue(r.yhat_oos[0] <= 1.0)
 
     def test_2d_feature_importances_(self):
-        pc = get_preproc_config(lags=3)
+        pc = get_preproc_config(lags=3, horizon=1)
         d = prepare_data(pc)
         mockConfigSVR = get_mock_svr(d)
 
@@ -90,7 +90,7 @@ class TestRunConfig(TestCase):
         self.assertEqual(r.feature_scores[0], ('lag1', 2))
 
     def test_3d_test_mode(self):
-        pc = get_preproc_config(lags=3)
+        pc = get_preproc_config(lags=3, horizon=1)
         d = prepare_data(pc, dim="3d")
         mockConfigLSTM = get_mock_lstm(d)
 
@@ -105,7 +105,7 @@ class TestRunConfig(TestCase):
         self.assertTrue(r.yhat_oos[0] <= 1.0)
 
     def test_3d_val_mode(self):
-        pc = get_preproc_config(lags=3)
+        pc = get_preproc_config(lags=3, horizon=1)
         d = prepare_data(pc, dim="3d")
         mockConfigLSTM = get_mock_lstm(d)
 
