@@ -1,11 +1,11 @@
 
 import logging
+import warnings
 
 from collections import Counter
 
 import numpy as np
 import pandas as pd
-
 from sklearn.metrics import mean_squared_error, mean_absolute_error
 
 from learner_configs import ConfigGB, ConfigLSTM
@@ -32,7 +32,7 @@ class Result:
         self.feature_scores = feature_scores
 
     def __str__(self):
-        return "RMSE: %.3f\tMAE: %.3f\tMAPE: %.3f" % (self.test_mse,
+        return "RMSE: %.3f MAE: %.3f MAPE: %.3f" % (self.test_mse,
                                                       self.test_mae,
                                                       self.test_mape)
 
@@ -76,6 +76,7 @@ def run_config(args):
 
     # feature importances
     if hasattr(model, 'feature_importances_'):
+        assert len(data.feature_names) == len(model.feature_importances_)
         feature_scores = Counter(dict((x, y)
                                  for x, y in zip(data.feature_names,
                                                  model.feature_importances_))
@@ -110,7 +111,12 @@ def get_mape(data, yhat, mode="train"):
     y = getattr(data, mode + "Yref")
     y_flat = y.values.reshape((-1,))
     yhat_flat = data.revert(yhat, mode).flatten()
-    return np.mean(np.abs((y_flat - yhat_flat) / y_flat)) * 100
+    with warnings.catch_warnings():
+        warnings.filterwarnings('error')
+        try:
+            return np.mean(np.abs((y_flat - yhat_flat) / y_flat)) * 100
+        except Warning:
+            return 0.0
 
 
 def separate_exogs(data, lags):
@@ -195,11 +201,13 @@ def run_config_space(pc, learner_config_space, get_val_results):
     yhat_is = data.revert(test_result.yhat_is, "train").flatten().tolist()
     yhat_val = data.revert(val_result.yhat_oos, "val").flatten().tolist()
 
-    LOGGER.info("Best config %s:\t%.3f\t%.3f\t%.3f\t%.3f\t%.3f\t%.3f\t%s" % (
+    LOGGER.info("Best config %s:\t%.3f\t%.3f\t%.3f\t%.3f\t%.3f\t%.3f\t%.3f\t%.3f\t%.3f\t%s" % (
         best_config.vals, test_result.train_mse, val_result.test_mse,
         test_result.test_mse, test_result.train_mae, val_result.test_mae,
-        test_result.test_mae, yhat_oos))
+        test_result.test_mae, test_result.train_mape, val_result.test_mape,
+        test_result.test_mape, yhat_oos))
 
+    LOGGER.info("Informative features:")
     for k, v in test_result.feature_scores:
         LOGGER.info("%s: %.3f" % (k, v))
 
@@ -231,5 +239,6 @@ def run_config_space(pc, learner_config_space, get_val_results):
                                                 'mae': v.test_mae,
                                                 'mape': v.test_mape}}
                                         for x, v in val_results.items()],
-                'feature_scores': test_result.feature_scores
+                'test_feature_scores': test_result.feature_scores,
+                'val_feature_scores': val_result.feature_scores
             }

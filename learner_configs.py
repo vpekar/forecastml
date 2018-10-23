@@ -96,6 +96,9 @@ class Config:
                 else:
                     # insert the buffer into instance
                     buf_len = len(buf)
+                    if buf_len > lags:
+                        buf = buf[-lags:]
+                        buf_len = lags
                     start = lags - buf_len
                     end = start + buf_len
                     instance = np.concatenate((instance[:start], buf,

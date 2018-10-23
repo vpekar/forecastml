@@ -136,6 +136,20 @@ class TestUtils2d(unittest.TestCase):
         self.assertEqual(d.testX[0].tolist(), [332, 342, 352])
         self.assertEqual(d.testY[0], 362)
 
+    def test_get_data_with_exog__all_exog_lags(self):
+        c = get_preproc_config(lags=3, use_exog=True)
+        d = prepare_data(c)
+        self.assertEqual(d.trainX.shape, (21, 9))
+        self.assertEqual(d.valX.shape, (5, 9))
+        self.assertEqual(d.testX.shape, (5, 9))
+        self.assertEqual(d.trainX[0].tolist(), [12, 22, 32, 10, 11, 20, 21, 30, 31])
+        self.assertEqual(d.trainY[0], 42)
+        self.assertEqual(d.valX[0].tolist(), [252, 262, 272, 250, 251, 260, 261, 270, 271])
+        self.assertEqual(d.valY[0], 282)
+        self.assertEqual(d.testX[0].tolist(), [332, 342, 352, 330, 331, 340, 341, 350, 351])
+        self.assertEqual(d.testY[0], 362)
+
+    @unittest.skip("Not using intent distances for 2d")
     def test_get_data_with_exog__intent0(self):
         c = get_preproc_config(lags=3, use_exog=True)
         d = prepare_data(c)
@@ -149,6 +163,7 @@ class TestUtils2d(unittest.TestCase):
         self.assertEqual(d.testX[0].tolist(), [332, 342, 352, 360, 361])
         self.assertEqual(d.testY[0], 362)
 
+    @unittest.skip("Not using intent distances for 2d")
     def test_get_data_with_exog__intent2(self):
         c = get_preproc_config(lags=3, use_exog=True, intent_distance=2)
         d = prepare_data(c)
@@ -161,9 +176,9 @@ class TestUtils2d(unittest.TestCase):
         self.assertEqual(d.testY[0], 362)
 
     def test_get_data__with_exog_only(self):
-        c = get_preproc_config(lags=3, use_exog=True, intent_distance=2)
+        c = get_preproc_config(lags=3, use_exog=True)
         d = prepare_data(c)
         trainX1, trainX2 = separate_exogs(d.trainX, lags=3)
         self.assertEqual(trainX1[0].tolist(), [12, 22, 32])
-        self.assertEqual(trainX2[0].tolist(), [20, 21])
+        self.assertEqual(trainX2[0].tolist(), [10, 11, 20, 21, 30, 31])
         self.assertEqual(d.trainY[0], 42)

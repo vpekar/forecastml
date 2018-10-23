@@ -3,18 +3,19 @@ PREPROCESSING = {
         "date_format": "%d/%m/%Y %H:%M:%S", # "%d-%b-%y",
         "test_split": 0.2,
         "difference": 0,
+        "predifference": 0,
         "detrend": 0,
         "deseason": 0,
         "seasonal_period": 7,
-        "feature_selection": 0, # [0, 1], 0 - no feature selection
         "horizon": 7,
-        "use_exog": 1,
-        "intent_distance": 0,
+        "feature_selection": 0,
+        "use_exog": 0,
         "lags": 7,
         "scale_range": [0, 1],
         "n_jobs": 2,
         "random_state": 7
         }
+
 
 ZMQ = {
        "master_address": "tcp://127.0.0.1:5557"

@@ -7,7 +7,6 @@ from copy import deepcopy
 from collections import Counter
 
 from sklearn.preprocessing import MinMaxScaler
-from sklearn.feature_selection import f_regression
 
 
 LOGGER = logging.getLogger('main.data')
@@ -21,21 +20,29 @@ class Data:
         """
 
         # options
+        # predifference: differenced values will not be reverted after testing
+        if config['predifference']:
+            assert config['difference'] == False
+            # both dependent and independent variables are predifferenced
+            for x in df.columns:
+                df[x] = self._difference(deepcopy(df[x])).ravel()
+
         self.y_orig = deepcopy(df['dep_var'])
         self.index = df.index.tolist()
         self.use_exog = config['use_exog']
         self.lags = config['lags']
         self.test_split = config['test_split']
-        self.intent_distance = config['intent_distance']
         self.horizon = config['horizon']
         self.y_scaler = None
         if config['scale_range'][0] != 0 or config['scale_range'][1] != 0:
             self.y_scaler = MinMaxScaler(feature_range=config['scale_range'])
         self.scale_range = config['scale_range']
         self.do_difference = config['difference']
+
         self.do_detrend = config['detrend']
         self.do_deseason = config['deseason']
         self.seasonal_period = config['seasonal_period']
+        self.feature_selection = config['feature_selection']
 
         self.stl_forecast = {}
 
@@ -48,17 +55,16 @@ class Data:
         self.test_start = self.val_end + self.lags
         self.test_end = df.shape[0]
 
-        if config['feature_selection'] != 0:
-            df = self.select_features(df, config['feature_selection'])
-
         # set original level Y's
         self.trainYref = self.y_orig[self.train_start+self.horizon-1:self.train_end]
         self.valYref = self.y_orig[self.val_start+self.horizon-1:self.val_end]
         self.testYref = self.y_orig[self.test_start+self.horizon-1:self.test_end]
 
         # feature_names
-        self.exog_names = deepcopy(df.columns).tolist()
-        self.exog_names.remove('dep_var')
+        exog_names = deepcopy(df.columns).tolist()
+        exog_names.remove('dep_var')
+        self.exog_names = ["%s%s" % (x, i) for i in range(self.lags)
+                           for x in exog_names]
         self.feature_names = []
 
         # data
@@ -82,33 +88,6 @@ class Data:
         return "trainX %s, trainY %s, valX %s, valY %s, testX %s, testY %s" % (
             self.trainX.shape, self.trainY.shape, self.valX.shape,
             self.valY.shape, self.testX.shape, self.testY.shape)
-
-    def select_features(self, df, ratio):
-        """Select the most informative features
-        :param df: input dataframe
-        :param ratio: the number of features to select ([0, 1])
-        """
-        x_columns = df.columns[:-1]
-        num_sel = int((len(x_columns)) * ratio)
-        if num_sel == 0:
-            raise Exception("The feature_selection setting will remove "+
-                            "all features, review settings.py")
-
-        LOGGER.debug("Will select %d features" % num_sel)
-        scores = f_regression(df.values[:, :-1], df.values[:, -1], False)[0]
-        selected = Counter(dict(zip(x_columns, scores))).most_common(num_sel)
-
-        LOGGER.info("Selected features:")
-        for feature, score in selected:
-            LOGGER.info("%s\t%.6f" % (feature, score))
-
-        # delete de-selected columns
-        selected_names = [x for x, y in selected]
-        for col in x_columns:
-            if col not in selected_names:
-                del df[col]
-
-        return df
 
     def scale(self):
 
@@ -250,7 +229,9 @@ class Data:
         trainX2 = []
         for i, x in enumerate(endogs):
             # exogs are at the end of the lag period of the endogs
-            exog = exogs[i+self.lags-self.intent_distance]
+            exog = []
+            for lag_i in range(self.lags, 0, -1):
+                exog.extend(exogs[i+self.lags-lag_i])
             trainX2.append(np.concatenate([x, exog]))
         return np.array(trainX2)
 
@@ -288,8 +269,6 @@ class Data2d(Data):
 
     def preprocess(self, df):
         """Split into train and test for all methods except LSTM
-        :param intent_distance: 0 means the nouns from the same day are used
-            to forecast
         """
         train, val, test = self.split(df)
 
@@ -330,6 +309,47 @@ class Data2d(Data):
 
         # scale all variables to [0, 1]
         self.scale()
+
+        if self.feature_selection != 0:
+            self.select_features()
+
+    def pearson_r(self, x, y):
+        c = [np.corrcoef(x[:, col_i], y)[0, 1] for col_i in range(x.shape[1])]
+        c = np.abs(np.array(c))
+        c[np.isnan(c)] = 0.0
+        return c
+
+    def select_features(self):
+        """Select the most informative features
+        :param df: input dataframe
+        :param ratio: the number of features to select ([0, 1])
+        """
+
+        # train
+        num_sel = int(self.trainX.shape[1] * self.feature_selection)
+        if num_sel == 0:
+            raise Exception("The feature_selection setting will remove "+
+                            "all features, review settings.py")
+        LOGGER.debug("Will select %d features" % num_sel)
+
+        scores = self.pearson_r(self.trainX, self.trainY)
+        selected = Counter(dict(zip(self.feature_names, scores))).most_common(num_sel)
+
+        LOGGER.info("Selected features:")
+        for i, (feature, score) in enumerate(selected):
+            LOGGER.info("%d\t%s\t%.6f" % (i, feature, score))
+
+        # index of columns to be deleted
+        name2id = list(zip(self.feature_names, range(self.trainX.shape[1])))
+        idx = [v for k, v in name2id if k not in dict(selected)]
+
+        # delete de-selected columns
+        self.trainX = np.delete(self.trainX, idx, 1)
+        self.valX = np.delete(self.valX, idx, 1)
+        self.testX = np.delete(self.testX, idx, 1)
+        self.feature_names = [k for k, v in name2id if k in dict(selected)]
+
+        return
 
 
 class Data3d(Data):
@@ -438,8 +458,8 @@ class Data3d(Data):
             data2 = []
             dfvals = data.values
             for i, x in enumerate(dfvals):
-                if i >= self.intent_distance:
-                    exog = dfvals[i-self.intent_distance, :-1]
+                if i >= 0:
+                    exog = dfvals[i, :-1]
                 else:
                     exog = [None]*(data.shape[1] - 1)
                 data2.append(np.concatenate([exog, [x[-1]]]))

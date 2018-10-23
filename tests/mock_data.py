@@ -2,7 +2,7 @@ import pandas as pd
 from datetime import datetime, timedelta
 
 
-def get_preproc_config(lags=4, use_exog=False, intent_distance=0,
+def get_preproc_config(lags=4, use_exog=False,
                        detrend=False, deseason=False, difference=False,
                        scale=[0, 1], horizon=7, feature_selection=0):
     adict = {
@@ -10,13 +10,13 @@ def get_preproc_config(lags=4, use_exog=False, intent_distance=0,
         "date_format": "%Y-%m-%d",
         "test_split": 0.2,
         "difference": difference,
+        "predifference": False,
         "detrend": detrend,
         "deseason": deseason,
         "seasonal_period": 7,
         "horizon": horizon,
         "feature_selection": feature_selection,
         "use_exog": use_exog,
-        "intent_distance": intent_distance,
         "lags": lags,
         "scale_range": scale,
         "n_jobs": 1,
@@ -25,9 +25,9 @@ def get_preproc_config(lags=4, use_exog=False, intent_distance=0,
     return adict
 
 
-def get_date_list():
+def get_date_list(days=40):
     base = datetime(2000, 1, 1)
-    return [base+timedelta(days=x) for x in range(0, 40)]
+    return [base+timedelta(days=x) for x in range(0, days)]
 
 
 def get_df():
@@ -73,5 +73,32 @@ def get_df():
             [380, 381, 382],
             [390, 391, 392],
             [400, 401, 402]]
+    df = pd.DataFrame(data=data, index=idx, columns=columns)
+    return df
+
+
+def get_df2():
+    columns = ['dim0','dim1', 'dep_var']
+    data = [[5.1, 20, 100],
+            [5.2, 100, 20],
+            [5, 20, 100],
+            [5, 100, 20],
+            [5, 20, 100],
+            [5, 100, 20],
+            [5, 20, 100],
+            [5, 100, 20],
+            [5, 20, 100],
+            [5, 100, 20],
+            [5, 20, 100],
+            [5, 100, 20],
+            [5, 20, 100],
+            [5, 100, 20],
+            [5, 20, 100],
+            [5.1, 100, 20],
+            [5.2, 20, 100],
+            [5, 100, 20],
+            [5, 20, 100],
+            [5, 100, 20]]
+    idx = get_date_list(days=len(data))
     df = pd.DataFrame(data=data, index=idx, columns=columns)
     return df
