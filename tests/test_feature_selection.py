@@ -28,10 +28,10 @@ class TestFeatureSelection(unittest.TestCase):
         data.Data2d.scale = Mock()
 
     def test_select_features(self):
-        c = get_preproc_config(lags=3, use_exog=True, feature_selection=0.5)
+        c = get_preproc_config(lags=2, use_exog=True, feature_selection=0.5)
         d = prepare_data(c)
 
-        # keeping 4 variables after feature selection
+        # keeping 4 features after selection: 2 original lags and 2 exogs
         self.assertEqual(d.trainX.shape[1], 4)
         self.assertEqual(d.valX.shape[1], 4)
         self.assertEqual(d.testX.shape[1], 4)
@@ -58,8 +58,8 @@ class TestFeatureScoring(unittest.TestCase):
         c = get_preproc_config(lags=2, use_exog=True, feature_selection=0.5)
         d = prepare_data(c)
 
-        # ensure that the most informative values are kept
-        self.assertEqual(tuple(d.trainX[0].tolist()), (100, 20, 20))
+        # ensure that the lags + most informative exogs are kept
+        self.assertEqual(tuple(d.trainX[0].tolist()), (100, 20, 20, 100))
 
         # ensure relevant feature_names is left
-        self.assertEqual(tuple(d.feature_names), ('lag2', 'lag1', 'dim10'))
+        self.assertEqual(tuple(d.feature_names), ('lag2', 'lag1', 'dim10', 'dim11'))

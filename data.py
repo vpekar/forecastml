@@ -320,34 +320,35 @@ class Data2d(Data):
         return c
 
     def select_features(self):
-        """Select the most informative features
+        """Select the most informative features, keeping all lag features
         :param df: input dataframe
         :param ratio: the number of features to select ([0, 1])
         """
 
         # train
-        num_sel = int(self.trainX.shape[1] * self.feature_selection)
+        num_sel = int((self.trainX.shape[1] - self.lags) * self.feature_selection)
         if num_sel == 0:
             raise Exception("The feature_selection setting will remove "+
                             "all features, review settings.py")
         LOGGER.debug("Will select %d features" % num_sel)
 
-        scores = self.pearson_r(self.trainX, self.trainY)
-        selected = Counter(dict(zip(self.feature_names, scores))).most_common(num_sel)
+        scores = self.pearson_r(self.trainX[:, self.lags:], self.trainY)
+        selected = Counter(dict(zip(self.feature_names[self.lags:], scores))).most_common(num_sel)
 
         LOGGER.info("Selected features:")
         for i, (feature, score) in enumerate(selected):
             LOGGER.info("%d\t%s\t%.6f" % (i, feature, score))
 
         # index of columns to be deleted
-        name2id = list(zip(self.feature_names, range(self.trainX.shape[1])))
+        name2id = list(zip(self.feature_names[self.lags:], range(self.lags, self.trainX.shape[1])))
         idx = [v for k, v in name2id if k not in dict(selected)]
 
         # delete de-selected columns
         self.trainX = np.delete(self.trainX, idx, 1)
         self.valX = np.delete(self.valX, idx, 1)
         self.testX = np.delete(self.testX, idx, 1)
-        self.feature_names = [k for k, v in name2id if k in dict(selected)]
+        self.feature_names = self.feature_names[:self.lags] + \
+            [k for k, v in name2id if k in dict(selected)]
 
         return
 
