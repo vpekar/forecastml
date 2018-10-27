@@ -6,6 +6,7 @@ from collections import Counter
 
 import numpy as np
 import pandas as pd
+from scipy.ndimage.interpolation import shift
 from sklearn.metrics import mean_squared_error, mean_absolute_error
 
 from learner_configs import ConfigGB, ConfigLSTM
@@ -145,7 +146,17 @@ def mean_baseline(d, mode='test'):
     """Always predict the mean of train data
     """
     m = d.trainY.mean()
-    preds = np.array([m] * d.testY.shape[0])
+    y = getattr(d, mode + "Y")
+    preds = np.array([m] * y.shape[0])
+    return (get_mse(d, preds, mode), get_mae(d, preds, mode),
+              get_mape(d, preds, mode))
+
+
+def persistence_baseline(d, mode='test'):
+    """Always predict the previous day's Y value
+    """
+    y = getattr(d, mode + "Y")
+    preds = shift(y, 1, cval=0.0)
     return (get_mse(d, preds, mode), get_mae(d, preds, mode),
               get_mape(d, preds, mode))
 
@@ -153,9 +164,9 @@ def mean_baseline(d, mode='test'):
 def do_baseline(d):
     """Evaluate the baseline
     """
-    train_mse, train_mae, train_mape = mean_baseline(d, "train")
-    val_mse, val_mae, val_mape = mean_baseline(d, "val")
-    test_mse, test_mae, test_mape = mean_baseline(d, "test")
+    train_mse, train_mae, train_mape = persistence_baseline(d, "train")
+    val_mse, val_mae, val_mape = persistence_baseline(d, "val")
+    test_mse, test_mae, test_mape = persistence_baseline(d, "test")
     LOGGER.info("%.2f\t%.2f\t%.2f\t%.2f\t%.2f\t%.2f\t%.2f\t%.2f\t%.2f" % (
             train_mse, val_mse, test_mse, train_mae, val_mae, test_mae,
             train_mape, val_mape, test_mape))
@@ -174,7 +185,7 @@ def get_best_config(learner_config_space, preproc_config, mse_scores, results):
     return best_config, best_result
 
 
-def run_config_space(pc, learner_config_space, get_val_results):
+def run_config_space(pc, learner_config_space, get_val_results, baseline=False):
     """Run experiments with all possible settings in the config space
     :param pc: preprocessing config
     :param get_val_results: a function to run cross-validation on the
@@ -184,8 +195,9 @@ def run_config_space(pc, learner_config_space, get_val_results):
     # load data
     data = prepare_data(pc, dim=learner_config_space.dim)
 
-    # do_baseline(data)
-    # return
+    if baseline:
+        do_baseline(data)
+        return
 
     # search for best parameters on the validation set
     mse_scores, val_results = get_val_results(data, learner_config_space, pc)

@@ -340,7 +340,8 @@ class Data2d(Data):
             LOGGER.info("%d\t%s\t%.6f" % (i, feature, score))
 
         # index of columns to be deleted
-        name2id = list(zip(self.feature_names[self.lags:], range(self.lags, self.trainX.shape[1])))
+        name2id = list(zip(self.feature_names[self.lags:],
+                           range(self.lags, self.trainX.shape[1])))
         idx = [v for k, v in name2id if k not in dict(selected)]
 
         # delete de-selected columns
