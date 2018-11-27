@@ -122,6 +122,15 @@ def get_mape(data, yhat, mode="train"):
             return 0.0
 
 
+def get_mda(data, yhat, mode="train"):
+    """Mean Directional Accuracy, as per:
+    https://www.wikiwand.com/en/Mean_Directional_Accuracy
+    """
+    a = np.sign(np.diff(getattr(data, mode + "Yref")))
+    b = np.sign(np.diff(y_hat))
+    return np.sum(a == b)/a.shape[0]
+
+
 def separate_exogs(data, lags):
     """Output two arrays, one with endogs and one with exogs
     """
