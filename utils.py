@@ -9,7 +9,6 @@ import pandas as pd
 from scipy.ndimage.interpolation import shift
 from sklearn.metrics import mean_squared_error, mean_absolute_error
 
-from learner_configs import ConfigGB, ConfigLSTM
 from data import Data2d, Data3d
 
 
@@ -47,6 +46,22 @@ def interpolate(df):
     return df
 
 
+def sort_feature_scores(data, scores):
+    assert len(data.feature_names) == len(scores)
+    return Counter(dict((x, y) for x, y in zip(data.feature_names, scores))
+                            ).most_common()
+
+
+def get_feature_scores(model, data):
+    """Get feature scores from either feature importances or rankings
+    """
+    if hasattr(model, 'feature_importances_'):
+        return sort_feature_scores(data, model.feature_importances_)
+    elif hasattr(model, 'rankings_'):
+        return sort_feature_scores(data, -model.rankings_)
+    return []
+
+
 def run_config(args):
     """
     :param c: learner config
@@ -54,10 +69,7 @@ def run_config(args):
     """
     data, c, mode = args
 
-    if isinstance(c, (ConfigGB, ConfigLSTM)):
-        model = c.fit(data.trainX, data.trainY, data.valX, data.valY)
-    else:
-        model = c.fit(data.trainX, data.trainY)
+    model = c.train(data)
 
     # in-sample
     yhat_is = c.forecast(model, data.trainX)
@@ -66,24 +78,14 @@ def run_config(args):
     train_mape = get_mape(data, yhat_is, "train")
 
     # out-of-sample
-    if mode == 'test':
-        yhat_oos = c.forecast(model, data.testX)
-    else:
-        yhat_oos = c.forecast(model, data.valX)
+    yhat_oos = c.forecast(model, data.testX) if mode == 'test' \
+        else c.forecast(model, data.valX)
 
     test_mse = get_mse(data, yhat_oos, mode)
     test_mae = get_mae(data, yhat_oos, mode)
     test_mape = get_mape(data, yhat_oos, mode)
 
-    # feature importances
-    if hasattr(model, 'feature_importances_'):
-        assert len(data.feature_names) == len(model.feature_importances_)
-        feature_scores = Counter(dict((x, y)
-                                 for x, y in zip(data.feature_names,
-                                                 model.feature_importances_))
-                                ).most_common()
-    else:
-        feature_scores = []
+    feature_scores = get_feature_scores(model, data)
 
     return Result(train_mse, test_mse, train_mae, test_mae,
                   train_mape, test_mape, yhat_is, yhat_oos, c.vals,

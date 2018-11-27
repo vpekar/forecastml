@@ -20,21 +20,23 @@ def get_model(d, ret_val=[1.0]):
     return model
 
 
-def get_mock_svr(d):
+def get_mock_svr(d, pc):
     mockConfigSVR = create_autospec(ConfigSVR)
     side_effect = lambda x, y: np.array([.1]*y.shape[0])
     mockConfigSVR.forecast = Mock(side_effect=side_effect)
-    mockConfigSVR.fit = Mock(return_value=get_model(d))
+    mockConfigSVR.train = Mock(return_value=get_model(d))
     mockConfigSVR.vals = {"a": 1, "b": 2, "c": 3}
+    mockConfigSVR.pc = pc
     return mockConfigSVR
 
 
-def get_mock_lstm(d):
+def get_mock_lstm(d, pc):
     mockConfigLSTM = create_autospec(ConfigLSTM)
-    mockConfigLSTM.fit = Mock(return_value=get_model(d, [[1.0]]))
+    mockConfigLSTM.train = Mock(return_value=get_model(d, [[1.0]]))
     side_effect = lambda x, y: np.array([.1]*y.shape[0])
     mockConfigLSTM.forecast = Mock(side_effect=side_effect)
     mockConfigLSTM.vals = {"a": 1, "b": 2, "c": 3}
+    mockConfigLSTM.pc = pc
     return mockConfigLSTM
 
 
@@ -53,7 +55,7 @@ class TestRunConfig(TestCase):
     def test_2d_test_mode(self):
         pc = get_preproc_config(lags=3, horizon=1)
         d = prepare_data(pc)
-        mockConfigSVR = get_mock_svr(d)
+        mockConfigSVR = get_mock_svr(d, pc)
 
         r = run_config([d, mockConfigSVR, 'test'])
 
@@ -68,7 +70,7 @@ class TestRunConfig(TestCase):
     def test_2d_val_mode(self):
         pc = get_preproc_config(lags=3, horizon=1)
         d = prepare_data(pc)
-        mockConfigSVR = get_mock_svr(d)
+        mockConfigSVR = get_mock_svr(d, pc)
 
         r = run_config([d, mockConfigSVR, 'val'])
 
@@ -83,7 +85,7 @@ class TestRunConfig(TestCase):
     def test_2d_feature_importances_(self):
         pc = get_preproc_config(lags=3, horizon=1)
         d = prepare_data(pc)
-        mockConfigSVR = get_mock_svr(d)
+        mockConfigSVR = get_mock_svr(d, pc)
 
         r = run_config([d, mockConfigSVR, 'val'])
         self.assertEqual(len(r.feature_scores), 3)
@@ -92,7 +94,7 @@ class TestRunConfig(TestCase):
     def test_3d_test_mode(self):
         pc = get_preproc_config(lags=3, horizon=1)
         d = prepare_data(pc, dim="3d")
-        mockConfigLSTM = get_mock_lstm(d)
+        mockConfigLSTM = get_mock_lstm(d, pc)
 
         r = run_config([d, mockConfigLSTM, 'test'])
 
@@ -107,7 +109,7 @@ class TestRunConfig(TestCase):
     def test_3d_val_mode(self):
         pc = get_preproc_config(lags=3, horizon=1)
         d = prepare_data(pc, dim="3d")
-        mockConfigLSTM = get_mock_lstm(d)
+        mockConfigLSTM = get_mock_lstm(d, pc)
 
         r = run_config([d, mockConfigLSTM, 'val'])
 

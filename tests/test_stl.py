@@ -1,7 +1,7 @@
 
 import sys
-import unittest
-from mock import Mock
+from unittest import TestCase
+from unittest.mock import Mock
 
 import utils
 import data
@@ -10,6 +10,7 @@ from tests.mock_data import get_df, get_preproc_config
 
 import traceback
 import warnings
+
 
 def warn_with_traceback(message, category, filename, lineno, file=None,
                         line=None):
@@ -20,7 +21,7 @@ def warn_with_traceback(message, category, filename, lineno, file=None,
 warnings.showwarning = warn_with_traceback
 
 
-class TestDecompose2d(unittest.TestCase):
+class TestDecompose2d(TestCase):
 
     def setUp(self):
         try:
@@ -81,7 +82,7 @@ class TestDecompose2d(unittest.TestCase):
                          d.testYref[-1])
 
 
-class TestDecompose3d(unittest.TestCase):
+class TestDecompose3d(TestCase):
 
     def setUp(self):
         try:

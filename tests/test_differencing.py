@@ -1,5 +1,5 @@
-import unittest
-from mock import Mock
+from unittest import TestCase
+from unittest.mock import Mock
 
 import utils
 import data
@@ -7,7 +7,7 @@ from utils import prepare_data
 from tests.mock_data import get_df, get_preproc_config
 
 
-class TestDifferencing2d(unittest.TestCase):
+class TestDifferencing2d(TestCase):
 
     def setUp(self):
         try:
@@ -66,7 +66,7 @@ class TestDifferencing2d(unittest.TestCase):
         self.assertEqual(d.testYref[-1], reverted[-1])
 
 
-class TestDifferencing3d(unittest.TestCase):
+class TestDifferencing3d(TestCase):
 
     def setUp(self):
         try:

@@ -9,6 +9,7 @@ PREPROCESSING = {
         "seasonal_period": 7,
         "horizon": 7,
         "feature_selection": 0,
+        "rfe_step": 0,
         "use_exog": 0,
         "lags": 7,
         "scale_range": [0, 1],

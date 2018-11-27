@@ -28,8 +28,7 @@ class TestConfig2d(TestCase):
             ])
 
         pc = get_preproc_config(lags=3, horizon=1)
-        adict= {'kernel': 1., 'degree': 1., 'c': 1., 'eps': 1.}
-        c = ConfigSVR(adict, pc)
+        c = ConfigSVR({'kernel': 'rbf', 'degree': 1., 'c': 1., 'eps': 1.}, pc)
 
         yhat = c.forecast(model, testX)
         self.assertEqual(yhat.tolist(), [[1], [1], [1], [1], [1], [1]])
@@ -47,8 +46,7 @@ class TestConfig2d(TestCase):
             ])
 
         pc = get_preproc_config(lags=3, horizon=5)
-        adict= {'kernel': 1., 'degree': 1., 'c': 1., 'eps': 1.}
-        c = ConfigSVR(adict, pc)
+        c = ConfigSVR({'kernel': 'rbf', 'degree': 1., 'c': 1., 'eps': 1.}, pc)
 
         yhat = c.forecast(model, testX)
         self.assertEqual(yhat.tolist(), [[1], [1]])
@@ -71,8 +69,7 @@ class TestConfig2d(TestCase):
             ])
 
         pc = get_preproc_config(lags=3, horizon=2, use_exog=True)
-        adict= {'kernel': 1., 'degree': 1., 'c': 1., 'eps': 1.}
-        c = ConfigSVR(adict, pc)
+        c = ConfigSVR({'kernel': 'rbf', 'degree': 1., 'c': 1., 'eps': 1.}, pc)
 
         yhat = c.forecast(model, testX)
         calls = model.predict.call_args_list

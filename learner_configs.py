@@ -12,15 +12,16 @@ from sklearn.svm.classes import SVR
 from sklearn.ensemble import AdaBoostRegressor
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.ensemble import GradientBoostingRegressor
+from sklearn.feature_selection import RFE
 from early_stopping import Monitor
 
 from xgboost import XGBRegressor
 
-from keras import models
-from keras import layers
-from keras import callbacks
-from keras import regularizers
-from keras import backend
+from tensorflow.keras import models
+from tensorflow.keras import layers
+from tensorflow.keras import callbacks
+from tensorflow.keras import regularizers
+from tensorflow.keras import backend
 
 
 logging.getLogger("tensorflow").disabled = True
@@ -48,6 +49,8 @@ class ConfigSpace:
         LOGGER.info("Will evaluate %d configs" % self.num_configs)
 
     def generate_config(self):
+        """Yield one hyperparameter configuration
+        """
         param_names, param_values = zip(*self.parameter_ranges.items())
         i = 0
         for x in itertools.product(*param_values):
@@ -80,6 +83,34 @@ class Config:
     def __str__(self):
         return self.name
 
+    def train(self, data):
+        if self.pc['rfe_step'] != 0 and self.pc['feature_selection'] > 0:
+            # perform RFE (can be used only with some learners)
+            if not self.can_rfe:
+                raise Exception("Cannot use RFE with %s!" % self.learner)
+            model = self.rfe_fit(data.trainX, data.trainY)
+        else:
+            if isinstance(self, (ConfigGB, ConfigLSTM)):
+                model = self.fit(data.trainX, data.trainY, data.valX, data.valY)
+            else:
+                model = self.fit(data.trainX, data.trainY)
+        return model
+
+    def fit(self, x, y):
+        model = self.init_model()
+        model.fit(x, y)
+        return model
+
+    def rfe_fit(self, x, y):
+        """Recursive feature elimination
+        """
+        model = self.init_model()
+        num = int(x.shape[1] * self.pc['feature_selection'])
+        LOGGER.debug("RFE will select %d features" % num)
+        step = self.pc['rfe_step']
+        selector = RFE(model, n_features_to_select=num, step=step)
+        return selector.fit(x, y)
+
     def forecast(self, model, testX):
         """Return forecasts for all horizons up to `horizon`
         """
@@ -103,15 +134,14 @@ class Config:
                     end = start + buf_len
                     instance = np.concatenate((instance[:start], buf,
                                                instance[end:]))
-
                 pred_val = model.predict(instance.reshape(1, -1))[0]
                 if np.isnan(pred_val) or pred_val < -1.0 or pred_val > 1.0:
                     warnings.warn("Error forecasting %s, returning 0.5"
                                   % instance)
                     pred_val = 0.5
                 buf.append(pred_val)
-                LOGGER.debug("Predicting with instance %s, result %s" %
-                      (instance, pred_val))
+                #LOGGER.debug("Predicting with instance %s, result %s" %
+                #      (instance, pred_val))
             results.append(pred_val)
 
         return np.array(results).reshape(-1, 1)
@@ -119,70 +149,68 @@ class Config:
 
 class ConfigSVR(Config):
 
-    kernel = None
-    degree = None
-    c = None
-    eps = None
+    kernel = 'linear'
+    degree = 3
+    c = 1.0
+    eps = 0.1
+    can_rfe = True
 
-    def fit(self, x, y):
-        model = SVR(kernel=self.kernel, degree=self.degree, C=self.c,
+    def init_model(self):
+        return SVR(kernel=self.kernel, degree=self.degree, C=self.c,
                     epsilon=self.eps)
-        model.fit(x, y)
-        return model
 
 
 class ConfigAdaBoost(Config):
 
     n_estimators = None
-    learning_rate = None
-    loss = None
+    learning_rate = 1.0
+    loss = 'linear'
+    can_rfe = True
 
-    def fit(self, x, y):
-        model = AdaBoostRegressor(n_estimators=self.n_estimators,
+    def init_model(self):
+        return AdaBoostRegressor(n_estimators=self.n_estimators,
             learning_rate=self.learning_rate, loss=self.loss,
             random_state=self.pc['random_state'])
-        model.fit(x, y)
-        return model
 
 
 class ConfigRFR(Config):
 
-    n_estimators = None
-    max_features = None
+    n_estimators = 100
+    max_features = 'auto'
     max_depth = None
-    min_samples_split = None
-    min_samples_leaf = None
+    min_samples_split = 2
+    min_samples_leaf = 1
     max_leaf_nodes = None
+    can_rfe = True
 
-    def fit(self, x, y):
-        model = RandomForestRegressor(n_estimators=self.n_estimators,
+    def init_model(self):
+        return RandomForestRegressor(n_estimators=self.n_estimators,
             max_features=self.max_features, max_depth=self.max_depth,
             min_samples_split=self.min_samples_split,
             min_samples_leaf=self.min_samples_leaf,
             max_leaf_nodes=self.max_leaf_nodes,
             random_state=self.pc['random_state'])
-        model.fit(x, y)
-        return model
 
 
 class ConfigGB(Config):
 
-    n_estimators = None
-    learning_rate = None
-    loss = None
+    n_estimators = 100
+    learning_rate = 0.1
+    loss = 'ls'
     max_features = None
-    max_depth = None
-    min_samples_split = None
-    min_samples_leaf = None
+    max_depth = 3
+    min_samples_split = 2
+    min_samples_leaf = 1
     max_leaf_nodes = None
-    min_weight_fraction_leaf = None
-    subsample = None
-    alpha = None
-    warm_start = None
+    min_weight_fraction_leaf = 0.0
+    subsample = 1.0
+    alpha = 0.9
+    warm_start = False
     early_stopping = None
+    can_rfe = True
 
-    def fit(self, trainX, trainY, valX, valY):
-        model = GradientBoostingRegressor(n_estimators=self.n_estimators,
+    def init_model(self):
+        return GradientBoostingRegressor(n_estimators=self.n_estimators,
             learning_rate=self.learning_rate, loss=self.loss,
             max_features=self.max_features, max_depth=self.max_depth,
             min_samples_split=self.min_samples_split,
@@ -192,6 +220,9 @@ class ConfigGB(Config):
             subsample=self.subsample, alpha=self.alpha,
             warm_start=self.warm_start,
             random_state=self.pc['random_state'])
+
+    def fit(self, trainX, trainY, valX, valY):
+        model = self.init_model()
         model.fit(trainX, trainY,
             monitor=Monitor(valX.astype("float32"), valY.astype("float32"),
             max_consecutive_decreases=self.early_stopping))
@@ -200,22 +231,21 @@ class ConfigGB(Config):
 
 class ConfigXGBoost(Config):
 
-    max_depth = None
-    learning_rate = None
-    n_estimators = None
-    objective = None
-    booster = None
-    n_jobs = None
-    reg_alpha = None
+    max_depth = 3
+    learning_rate = 0.1
+    n_estimators = 100
+    objective = 'reg:linear'
+    booster = 'gbtree'
+    n_jobs = 1
+    reg_alpha = 0
+    can_rfe = True
 
-    def fit(self, trainX, trainY):
-        model = XGBRegressor(max_depth=self.max_depth,
+    def init_model(self):
+        return XGBRegressor(max_depth=self.max_depth,
             objective=self.objective, n_estimators=self.n_estimators,
             learning_rate=self.learning_rate, booster=self.booster,
-            reg_alpha=self.reg_alpha, n_jobs=self.n_jobs,
+            reg_alpha=self.reg_alpha, n_jobs=self.n_jobs, nthread=self.n_jobs,
             random_state=self.pc['random_state'])
-        model.fit(trainX, trainY)
-        return model
 
 
 class ConfigLSTM(Config):
@@ -231,6 +261,7 @@ class ConfigLSTM(Config):
     bias_regularization = (0.0, 0.0)
     early_stopping = None
     stateful = None
+    can_rfe = False
 
     def fit(self, trainX, trainY, valX, valY):
         """Importing Keras to be able to use it with multiprocessing
@@ -336,8 +367,8 @@ class ConfigLSTM(Config):
                     instance[-buf_len:, -1] = np.array(buf)
                 pred_val = model.predict(instance[np.newaxis, :, :])[0][0]
                 buf.append(pred_val)
-                LOGGER.debug("Predicting with instance %s, result %s" %
-                             (instance, pred_val))
+                #LOGGER.debug("Predicting with instance %s, result %s" %
+                #             (instance, pred_val))
             results.append(pred_val)
 
         return np.array(results).reshape(-1, 1)

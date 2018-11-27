@@ -43,6 +43,7 @@ class Data:
         self.do_deseason = config['deseason']
         self.seasonal_period = config['seasonal_period']
         self.feature_selection = config['feature_selection']
+        self.rfe_step = config['rfe_step']
 
         self.stl_forecast = {}
 
@@ -310,7 +311,7 @@ class Data2d(Data):
         # scale all variables to [0, 1]
         self.scale()
 
-        if self.feature_selection != 0:
+        if self.feature_selection > 0 and self.rfe_step == 0:
             self.select_features()
 
     def pearson_r(self, x, y):
@@ -328,8 +329,9 @@ class Data2d(Data):
         # train
         num_sel = int((self.trainX.shape[1] - self.lags) * self.feature_selection)
         if num_sel == 0:
-            raise Exception("The feature_selection setting will remove "+
-                            "all features, review settings.py")
+            raise Exception(
+                "Feature_selection=%.3f removes all features, review settings"
+                % self.feature_selection)
         LOGGER.debug("Will select %d features" % num_sel)
 
         scores = self.pearson_r(self.trainX[:, self.lags:], self.trainY)
@@ -340,8 +342,7 @@ class Data2d(Data):
             LOGGER.info("%d\t%s\t%.6f" % (i, feature, score))
 
         # index of columns to be deleted
-        name2id = list(zip(self.feature_names[self.lags:],
-                           range(self.lags, self.trainX.shape[1])))
+        name2id = list(zip(self.feature_names[self.lags:], range(self.lags, self.trainX.shape[1])))
         idx = [v for k, v in name2id if k not in dict(selected)]
 
         # delete de-selected columns
