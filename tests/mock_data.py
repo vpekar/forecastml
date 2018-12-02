@@ -2,8 +2,7 @@ import pandas as pd
 from datetime import datetime, timedelta
 
 
-def get_preproc_config(lags=4, use_exog=False,
-                       detrend=False, deseason=False, difference=False,
+def get_preproc_config(lags=4, use_exog=False, deseason=False, difference=False,
                        scale=[0, 1], horizon=7, feature_selection=0,
                        rfe_step=0):
     adict = {
@@ -11,8 +10,6 @@ def get_preproc_config(lags=4, use_exog=False,
         "date_format": "%Y-%m-%d",
         "test_split": 0.2,
         "difference": difference,
-        "predifference": False,
-        "detrend": detrend,
         "deseason": deseason,
         "seasonal_period": 7,
         "horizon": horizon,

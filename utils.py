@@ -127,7 +127,7 @@ def get_mda(data, yhat, mode="train"):
     https://www.wikiwand.com/en/Mean_Directional_Accuracy
     """
     a = np.sign(np.diff(getattr(data, mode + "Yref")))
-    b = np.sign(np.diff(y_hat))
+    b = np.sign(np.diff(yhat))
     return np.sum(a == b)/a.shape[0]
 
 

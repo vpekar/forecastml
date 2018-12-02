@@ -3,8 +3,6 @@ PREPROCESSING = {
         "date_format": "%d/%m/%Y %H:%M:%S", # "%d-%b-%y",
         "test_split": 0.2,
         "difference": 0,
-        "predifference": 0,
-        "detrend": 0,
         "deseason": 0,
         "seasonal_period": 7,
         "horizon": 7,
