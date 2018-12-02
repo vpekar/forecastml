@@ -7,11 +7,11 @@ A Python package for running experiments with machine learning regressors on tim
 
 * Adaboost, Gradient Boosting, Random Forest, Support Vector, XGBoost, (bidirectional) LSTM regression algorithms
 
-* Detrending and seasonal decomposition using STL
+* Seasonal decomposition
 
 * Feature selection using Pearson's _r_ and recursive feature elimination
 
-* In-sample and out-of-sample forecast evaluation in terms of RMSE, MAE, MAPE
+* In-sample and out-of-sample forecast evaluation in terms of RMSE, MAE, MAPE, Mean Directional Accuracy
 
 * Multiprocessing with the multiprocessing package
 
@@ -102,17 +102,14 @@ Produces plots with forecast values on the in-sample, validation, and out-of-sam
 
 * celery (optional, required only for distributed processing)
 
-* [stldecompose](https://github.com/jrmontag/STLDecompose) (optional, required only for seasonal decomposition and detrending)
-
 * [xgboost](http://xgboost.readthedocs.io/en/latest/python/python_intro.html) (optional, required only for XGBoost)
 
-All the packages come installed with [Anaconda](https://conda.io/docs/user-guide/install/download.html), except celery, tensorflow, stldecompose, and xgboost, which can be installed with conda or pip:
+All the packages come installed with [Anaconda](https://conda.io/docs/user-guide/install/download.html), except celery, tensorflow, and xgboost, which can be installed with conda or pip:
 
 ```
 $ conda install -c conda-forge celery
 $ conda install -c conda-forge xgboost
 $ conda install -c conda-forge tensorflow
-$ pip install stldecompose
 ```
 
 
