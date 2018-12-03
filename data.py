@@ -6,9 +6,27 @@ from copy import deepcopy
 from collections import Counter
 
 from sklearn.preprocessing import MinMaxScaler
+from statsmodels.tsa.seasonal import seasonal_decompose
 
 
 LOGGER = logging.getLogger('main.data')
+
+
+def deseasonalize(train, test, n_periods):
+    """Return deseasonalized train and test arrays
+    """
+
+    train_seasonal = seasonal_decompose(train, freq=n_periods).seasonal
+    cycle = train_seasonal[:n_periods].tolist()
+
+    train_tail = train.shape[0] % n_periods
+    test_seasonal = cycle[train_tail:]
+
+    n_test_cycles = int(((test.shape[0] - len(test_seasonal))/n_periods)) + 1
+    test_seasonal = test_seasonal + cycle*n_test_cycles
+    test_seasonal = np.array(test_seasonal[:test.shape[0]])
+
+    return train - train_seasonal, test - test_seasonal
 
 
 class Data:
@@ -19,13 +37,12 @@ class Data:
         """
 
         # options
-        # predifference: differenced values will not be reverted after testing
+        # differenced values will not be reverted after testing
         if config['difference']:
-            # both dependent and independent variables are predifferenced
+            # both dependent and independent variables are differenced
             for x in df.columns:
                 df[x] = self._difference(deepcopy(df[x])).ravel()
 
-        y_orig = deepcopy(df['dep_var'])
         self.use_exog = config['use_exog']
         self.lags = config['lags']
         self.test_split = config['test_split']
@@ -34,9 +51,6 @@ class Data:
         if config['scale_range'][0] != 0 or config['scale_range'][1] != 0:
             self.y_scaler = MinMaxScaler(feature_range=config['scale_range'])
         self.scale_range = config['scale_range']
-
-        self.do_deseason = config['deseason']
-        self.seasonal_period = config['seasonal_period']
 
         self.feature_selection = config['feature_selection']
         self.rfe_step = config['rfe_step']
@@ -50,7 +64,12 @@ class Data:
         self.test_start = self.val_end + self.lags
         self.test_end = df.shape[0]
 
+        if config['deseason']:
+            df['dep_var'] = self._deseasonalize(df['dep_var'],
+                                                config['seasonal_period'])
+
         # set original level Y's
+        y_orig = deepcopy(df['dep_var'])
         self.trainYref = y_orig[self.train_start+self.horizon-1:self.train_end]
         self.valYref = y_orig[self.val_start+self.horizon-1:self.val_end]
         self.testYref = y_orig[self.test_start+self.horizon-1:self.test_end]
@@ -110,6 +129,16 @@ class Data:
 
     def _difference(self, array):
         return np.append([0.0], np.diff(array.ravel()), axis=0).reshape(-1, 1)
+
+    def _deseasonalize(self, y, seasonal_period):
+        """Deseason the train, validation and test series
+        """
+        train2, val2 = deseasonalize(y[:self.train_end],
+                                     y[self.train_end:self.val_end],
+                                     seasonal_period)
+        dummy, test2 = deseasonalize(y[:self.val_end], y[self.val_end:],
+                                     seasonal_period)
+        return np.concatenate([train2, val2, test2])
 
     def revert(self, series, mode="train"):
         """Take yhat (forecasted series) and turn it to levels.

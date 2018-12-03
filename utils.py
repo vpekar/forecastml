@@ -131,12 +131,6 @@ def get_mda(data, yhat, mode="train"):
     return np.sum(a == b)/a.shape[0]
 
 
-def separate_exogs(data, lags):
-    """Output two arrays, one with endogs and one with exogs
-    """
-    return data[:, :lags], data[:, lags:]
-
-
 def load_df(filename, date_format='%Y-%m-%d %H:%M:%S'):
     return pd.read_csv(filename, index_col='date', parse_dates=['date'],
         date_parser=lambda x: pd.datetime.strptime(x, date_format))

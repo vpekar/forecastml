@@ -3,7 +3,7 @@ from unittest.mock import Mock
 
 import utils
 import data
-from utils import prepare_data, separate_exogs
+from utils import prepare_data
 from tests.mock_data import get_df, get_preproc_config
 
 
@@ -174,11 +174,3 @@ class TestUtils2d(TestCase):
         self.assertEqual(d.valY[0], 282)
         self.assertEqual(d.testX[0].tolist(), [332, 342, 352, 340, 341])
         self.assertEqual(d.testY[0], 362)
-
-    def test_get_data__with_exog_only(self):
-        c = get_preproc_config(lags=3, use_exog=True)
-        d = prepare_data(c)
-        trainX1, trainX2 = separate_exogs(d.trainX, lags=3)
-        self.assertEqual(trainX1[0].tolist(), [12, 22, 32])
-        self.assertEqual(trainX2[0].tolist(), [10, 11, 20, 21, 30, 31])
-        self.assertEqual(d.trainY[0], 42)

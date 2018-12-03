@@ -27,7 +27,6 @@ class TestFeatureSelection(TestCase):
             importlib.reload(data)
             importlib.reload(utils)
         utils.pd.read_csv = Mock(return_value=get_df())
-        data.Data2d.decompose = Mock()
         data.Data2d.scale = Mock()
 
     def test_select_features(self):
@@ -54,7 +53,6 @@ class TestFeatureScoring(TestCase):
             importlib.reload(data)
             importlib.reload(utils)
         utils.pd.read_csv = Mock(return_value=get_df2())
-        data.Data2d.decompose = Mock()
         data.Data2d.scale = Mock()
 
     def test_scoring(self):
