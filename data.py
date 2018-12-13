@@ -1,9 +1,10 @@
 import logging
-import numpy as np
-import pandas as pd
 
 from copy import deepcopy
 from collections import Counter
+
+import numpy as np
+import pandas as pd
 
 from sklearn.preprocessing import MinMaxScaler
 from statsmodels.tsa.seasonal import seasonal_decompose
@@ -67,7 +68,7 @@ class Data:
         if config['deseason']:
             df['dep_var'] = self._deseasonalize(df['dep_var'],
                                                 config['seasonal_period'])
-
+        #self.df = df
         # set original level Y's
         y_orig = deepcopy(df['dep_var'])
         self.trainYref = y_orig[self.train_start+self.horizon-1:self.train_end]
@@ -133,17 +134,17 @@ class Data:
     def _deseasonalize(self, y, seasonal_period):
         """Deseason the train, validation and test series
         """
-        train2, val2 = deseasonalize(y[:self.train_end],
-                                     y[self.train_end:self.val_end],
-                                     seasonal_period)
-        dummy, test2 = deseasonalize(y[:self.val_end], y[self.val_end:],
-                                     seasonal_period)
-        return np.concatenate([train2, val2, test2])
+        train, val = deseasonalize(y[:self.train_end],
+                                   y[self.train_end:self.val_end],
+                                   seasonal_period)
+        dummy, test = deseasonalize(y[:self.val_end], y[self.val_end:],
+                                    seasonal_period)
+        return np.concatenate([train, val, test])
 
-    def revert(self, series, mode="train"):
+    def revert(self, yhat, mode="train"):
         """Take yhat (forecasted series) and turn it to levels.
         """
-        reverted = deepcopy(series)
+        reverted = deepcopy(yhat)
 
         # de-scale
         if self.y_scaler:
@@ -182,10 +183,10 @@ class Data2d(Data):
         train = vals[:self.train_end]
         val = vals[self.train_end:self.val_end]
         test = vals[self.val_end:]
-        LOGGER.debug("df shape %s" % str(df.shape))
-        LOGGER.debug("train shape %s" % str(train.shape))
-        LOGGER.debug("val shape %s" % str(val.shape))
-        LOGGER.debug("test shape %s" % str(test.shape))
+        LOGGER.debug("input df shape %s" % str(df.shape))
+        #LOGGER.debug("train shape %s" % str(train.shape))
+        #LOGGER.debug("val shape %s" % str(val.shape))
+        #LOGGER.debug("test shape %s" % str(test.shape))
         return train, val, test
 
     def preprocess(self, df):
@@ -244,7 +245,7 @@ class Data2d(Data):
             raise Exception(
                 "Feature_selection=%.3f removes all features, review settings"
                 % self.feature_selection)
-        LOGGER.debug("Will select %d features" % num_sel)
+        LOGGER.debug("Will select %d exog features" % num_sel)
 
         scores = self.pearson_r(self.trainX[:, self.lags:], self.trainY)
         selected = Counter(dict(zip(self.feature_names[self.lags:], scores))

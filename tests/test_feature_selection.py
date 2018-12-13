@@ -66,7 +66,7 @@ class TestFeatureScoring(TestCase):
         self.assertEqual(tuple(d.feature_names), ('lag2', 'lag1', 'dim10', 'dim11'))
 
 
-class TestRfeFeatureSelection(TestCase):
+class TestRfeFeatureSelectionForecast(TestCase):
 
     def setUp(self):
         try:
@@ -98,4 +98,55 @@ class TestRfeFeatureSelection(TestCase):
 
     def test_2d_xgb(self):
         yhat = self.get_forecast(ConfigXGBoost, {})
+        self.assertAlmostEqual(yhat.tolist()[0][0], 1.0, 1)
+
+    def test_2d_gb_with_early_stopping(self):
+        yhat = self.get_forecast(ConfigGB, {'early_stopping': 3})
+        self.assertAlmostEqual(yhat.tolist()[0][0], 1.0, 1)
+
+    def test_2d_xgb_with_early_stopping(self):
+        yhat = self.get_forecast(ConfigXGBoost, {'early_stopping': 3})
+        self.assertAlmostEqual(yhat.tolist()[0][0], 1.0, 1)
+
+
+class TestFeatureSelectionForecast(TestCase):
+
+    def setUp(self):
+        try:
+            reload(data)
+            reload(utils)
+        except NameError:
+            import importlib
+            importlib.reload(data)
+            importlib.reload(utils)
+        utils.pd.read_csv = Mock(return_value=get_df())
+
+    def get_forecast(self, config, config_dict):
+        pc = get_preproc_config(lags=3, use_exog=True, horizon=1,
+                                feature_selection=0.5, rfe_step=0)
+        d = prepare_data(pc)
+        c = config(config_dict, pc)
+        model = c.train(d)
+        yhat = c.forecast(model, np.array([d.testX[0]]))
+        return yhat
+
+    def test_2d_svr(self):
+        yhat = self.get_forecast(ConfigSVR,
+            {'kernel': 'linear', 'degree': 1., 'c': 1., 'eps': 1.})
+        self.assertAlmostEqual(yhat.tolist()[0][0], 0.5, 1)
+
+    def test_2d_gb(self):
+        yhat = self.get_forecast(ConfigGB, {})
+        self.assertAlmostEqual(yhat.tolist()[0][0], 1.0, 1)
+
+    def test_2d_xgb(self):
+        yhat = self.get_forecast(ConfigXGBoost, {})
+        self.assertAlmostEqual(yhat.tolist()[0][0], 1.0, 1)
+
+    def test_2d_gb_with_early_stopping(self):
+        yhat = self.get_forecast(ConfigGB, {'early_stopping': 3})
+        self.assertAlmostEqual(yhat.tolist()[0][0], 1.0, 1)
+
+    def test_2d_xgb_with_early_stopping(self):
+        yhat = self.get_forecast(ConfigXGBoost, {'early_stopping': 3})
         self.assertAlmostEqual(yhat.tolist()[0][0], 1.0, 1)

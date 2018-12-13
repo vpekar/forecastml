@@ -11,11 +11,9 @@ from datetime import datetime
 from sklearn.svm.classes import SVR
 from sklearn.ensemble import AdaBoostRegressor
 from sklearn.ensemble import RandomForestRegressor
-from sklearn.ensemble import GradientBoostingRegressor
 from sklearn.feature_selection import RFE
-from early_stopping import Monitor
 
-from xgboost import XGBRegressor
+from learner_wrappers import GBWrapper, XGBWrapper
 
 from tensorflow.keras import models
 from tensorflow.keras import layers
@@ -85,31 +83,41 @@ class Config:
 
     def train(self, data):
         if self.pc['rfe_step'] != 0 and self.pc['feature_selection'] > 0:
-            # perform RFE (can be used only with some learners)
-            if not self.can_rfe:
-                raise Exception("Cannot use RFE with %s!" % self.learner)
-            model = self.rfe_fit(data.trainX, data.trainY)
+            model = self.rfe_fit(data)
         else:
-            if isinstance(self, (ConfigGB, ConfigLSTM)):
-                model = self.fit(data.trainX, data.trainY, data.valX, data.valY)
-            else:
-                model = self.fit(data.trainX, data.trainY)
+            model = self.fit(data)
         return model
 
-    def fit(self, x, y):
-        model = self.init_model()
-        model.fit(x, y)
+    def fit(self, data):
+        if isinstance(self, (ConfigGB, ConfigXGBoost)) and self.early_stopping:
+            model = self.init_model(early_stopping=self.early_stopping,
+                                    num_train=data.trainX.shape[0])
+            x = np.concatenate((data.trainX, data.valX))
+            y = np.concatenate((data.trainY, data.valY))
+            model.fit(x, y)
+        else:
+            model = self.init_model()
+            model.fit(data.trainX, data.trainY)
         return model
 
-    def rfe_fit(self, x, y):
+    def rfe_fit(self, data):
         """Recursive feature elimination
         """
-        model = self.init_model()
-        num = int(x.shape[1] * self.pc['feature_selection'])
+        if isinstance(self, (ConfigGB, ConfigXGBoost)):
+            model = self.init_model(early_stopping=self.early_stopping,
+                                    num_train=data.trainX.shape[0])
+        else:
+            model = self.init_model()
+        num = int(data.trainX.shape[1] * self.pc['feature_selection'])
         LOGGER.debug("RFE will select %d features" % num)
         step = self.pc['rfe_step']
         selector = RFE(model, n_features_to_select=num, step=step)
-        return selector.fit(x, y)
+        if isinstance(self, (ConfigGB, ConfigXGBoost)) and self.early_stopping:
+            x = np.concatenate((data.trainX, data.valX))
+            y = np.concatenate((data.trainY, data.valY))
+            return selector.fit(x, y)
+        else:
+            return selector.fit(data.trainX, data.trainY)
 
     def forecast(self, model, testX):
         """Return forecasts for all horizons up to `horizon`
@@ -118,7 +126,7 @@ class Config:
         results = []
         horizon = self.pc['horizon']
         lags = self.pc['lags']
-
+        LOGGER.debug("Forecasting test: %s" % testX)
         for i in range(len(testX) - horizon + 1):
             for j in range(horizon):
                 instance = testX[i+j]
@@ -140,8 +148,8 @@ class Config:
                                   % instance)
                     pred_val = 0.5
                 buf.append(pred_val)
-                #LOGGER.debug("Predicting with instance %s, result %s" %
-                #      (instance, pred_val))
+                LOGGER.debug("Predicting with instance %s, result %s" %
+                      (instance, pred_val))
             results.append(pred_val)
 
         return np.array(results).reshape(-1, 1)
@@ -153,7 +161,6 @@ class ConfigSVR(Config):
     degree = 3
     c = 1.0
     eps = 0.1
-    can_rfe = True
 
     def init_model(self):
         return SVR(kernel=self.kernel, degree=self.degree, C=self.c,
@@ -165,7 +172,6 @@ class ConfigAdaBoost(Config):
     n_estimators = None
     learning_rate = 1.0
     loss = 'linear'
-    can_rfe = True
 
     def init_model(self):
         return AdaBoostRegressor(n_estimators=self.n_estimators,
@@ -181,7 +187,6 @@ class ConfigRFR(Config):
     min_samples_split = 2
     min_samples_leaf = 1
     max_leaf_nodes = None
-    can_rfe = True
 
     def init_model(self):
         return RandomForestRegressor(n_estimators=self.n_estimators,
@@ -207,10 +212,9 @@ class ConfigGB(Config):
     alpha = 0.9
     warm_start = False
     early_stopping = None
-    can_rfe = True
 
-    def init_model(self):
-        return GradientBoostingRegressor(n_estimators=self.n_estimators,
+    def init_model(self, early_stopping=None, num_train=None):
+        return GBWrapper(n_estimators=self.n_estimators,
             learning_rate=self.learning_rate, loss=self.loss,
             max_features=self.max_features, max_depth=self.max_depth,
             min_samples_split=self.min_samples_split,
@@ -219,14 +223,8 @@ class ConfigGB(Config):
             min_weight_fraction_leaf=self.min_weight_fraction_leaf,
             subsample=self.subsample, alpha=self.alpha,
             warm_start=self.warm_start,
-            random_state=self.pc['random_state'])
-
-    def fit(self, trainX, trainY, valX, valY):
-        model = self.init_model()
-        model.fit(trainX, trainY,
-            monitor=Monitor(valX.astype("float32"), valY.astype("float32"),
-            max_consecutive_decreases=self.early_stopping))
-        return model
+            random_state=self.pc['random_state'],
+            early_stopping=early_stopping, num_train=num_train)
 
 
 class ConfigXGBoost(Config):
@@ -238,14 +236,15 @@ class ConfigXGBoost(Config):
     booster = 'gbtree'
     n_jobs = 1
     reg_alpha = 0
-    can_rfe = True
+    early_stopping = None
 
-    def init_model(self):
-        return XGBRegressor(max_depth=self.max_depth,
+    def init_model(self, early_stopping=None, num_train=None):
+        return XGBWrapper(max_depth=self.max_depth,
             objective=self.objective, n_estimators=self.n_estimators,
             learning_rate=self.learning_rate, booster=self.booster,
             reg_alpha=self.reg_alpha, n_jobs=self.n_jobs, nthread=self.n_jobs,
-            random_state=self.pc['random_state'])
+            random_state=self.pc['random_state'],
+            early_stopping=early_stopping, num_train=num_train)
 
 
 class ConfigLSTM(Config):
@@ -261,9 +260,8 @@ class ConfigLSTM(Config):
     bias_regularization = (0.0, 0.0)
     early_stopping = None
     stateful = None
-    can_rfe = False
 
-    def fit(self, trainX, trainY, valX, valY):
+    def fit(self, data):
         """Importing Keras to be able to use it with multiprocessing
         """
 
@@ -290,9 +288,9 @@ class ConfigLSTM(Config):
                       return_sequences=return_sequences_on_input,
                       kernel_regularizer=kernel_regularizer,
                       bias_regularizer=bias_regularizer),
-                      input_shape=(None, trainX.shape[2]),))
+                      input_shape=(None, data.trainX.shape[2]),))
         else:
-            model.add(layers.LSTM(input_shape=(None, trainX.shape[2]),
+            model.add(layers.LSTM(input_shape=(None, data.trainX.shape[2]),
                     units=self.topology[0],
                     activation=self.activation,
                     return_sequences=return_sequences_on_input,
@@ -330,20 +328,25 @@ class ConfigLSTM(Config):
                 filepath="logs/%s" % os.getpid() + \
                     "-weights.{epoch:02d}-{val_loss:.2f}.hdf5",
                 monitor='val_loss', save_best_only=True, verbose=0)
-            model.fit(trainX, trainY, epochs=self.epochs,
+            model.fit(data.trainX, data.trainY, epochs=self.epochs,
                 batch_size=self.batch_size, verbose=0,
                 # validation_data=(valX, valY), callbacks=callbacks)
-                validation_data=(trainX, trainY),
+                validation_data=(data.trainX, data.trainY),
                                  callbacks=[early_stopping, model_check_point])
         else:
-            model.fit(trainX, trainY, epochs=self.epochs,
+            model.fit(data.trainX, data.trainY, epochs=self.epochs,
                 batch_size=self.batch_size, verbose=0,
                 # validation_data=(valX, valY))
-                validation_data=(trainX, trainY))
+                validation_data=(data.trainX, data.trainY))
 
         LOGGER.debug("Pid: %s: trained LSTM." % os.getpid())
 
         return model
+
+    def rfe_fit(self, data):
+        """Cannot do Recursive Feature Elimination
+        """
+        raise Exception("Cannot use RFE with %s" % self.learner)
 
     def forecast(self, model, testX):
         """Return forecasts for all horizons up to `horizon`
