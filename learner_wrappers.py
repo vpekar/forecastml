@@ -72,6 +72,6 @@ class XGBWrapper(XGBRegressor):
             eval_set = [[valX.astype("float32"),
                         valY.astype("float32")]]
             super().fit(trainX, trainY, eval_set=eval_set, eval_metric='rmse',
-                      early_stopping_rounds=self.early_stopping)
+                      early_stopping_rounds=self.early_stopping, verbose=False)
         else:
             super().fit(x, y)
