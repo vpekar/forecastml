@@ -56,7 +56,11 @@ def get_feature_scores(model, data):
     """Get feature scores from either feature importances or rankings
     """
     if hasattr(model, 'feature_importances_'):
-        return sort_feature_scores(data, model.feature_importances_.tolist())
+        if not isinstance(model.feature_importances_, list):
+            features = model.feature_importances_.tolist()
+        else:
+            features = model.feature_importances_
+        return sort_feature_scores(data, features)
     elif hasattr(model, 'rankings_'):
         return sort_feature_scores(data, -model.rankings_)
     return []
