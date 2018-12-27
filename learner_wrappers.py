@@ -25,12 +25,21 @@ class GBWrapper(GradientBoostingRegressor):
                  early_stopping=None, num_train=0):
         self.early_stopping = early_stopping
         self.num_train = num_train
-        super().__init__(loss, learning_rate, n_estimators, subsample,
+        try:
+            # scikit-learn>=0.20.1
+            super().__init__(loss, learning_rate, n_estimators, subsample,
              criterion, min_samples_split, min_samples_leaf,
              min_weight_fraction_leaf, max_depth, min_impurity_decrease,
              min_impurity_split, init, random_state, max_features, alpha,
              verbose, max_leaf_nodes, warm_start, presort, validation_fraction,
              n_iter_no_change, tol)
+        except TypeError:
+            # scikit-learn<=0.19.2
+            super().__init__(loss, learning_rate, n_estimators, subsample,
+             criterion, min_samples_split, min_samples_leaf,
+             min_weight_fraction_leaf, max_depth, min_impurity_decrease,
+             min_impurity_split, init, random_state, max_features, alpha,
+             verbose, max_leaf_nodes, warm_start, presort)
 
     def fit(self, x, y):
         if self.early_stopping:
