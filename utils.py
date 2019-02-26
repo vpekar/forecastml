@@ -1,4 +1,3 @@
-
 import logging
 import warnings
 
@@ -55,15 +54,25 @@ def sort_feature_scores(data, scores):
 def get_feature_scores(model, data):
     """Get feature scores from either feature importances or rankings
     """
-    if hasattr(model, 'feature_importances_'):
-        if not isinstance(model.feature_importances_, list):
-            features = model.feature_importances_.tolist()
-        else:
-            features = model.feature_importances_
-        return sort_feature_scores(data, features)
-    elif hasattr(model, 'rankings_'):
-        return sort_feature_scores(data, -model.rankings_)
-    return []
+    def get_features_by_attr(model):
+        for name in ['feature_importances_', 'coef_']:
+            if hasattr(model, name):
+                importances = getattr(model, name)
+                if not isinstance(importances, list):
+                    importances = importances.tolist()
+                return importances
+        return None
+                
+    features = get_features_by_attr(model)
+    if features is None:
+        if hasattr(model, 'rankings_'):
+            features = sort_feature_scores(data, -model.rankings_)
+        elif hasattr(model, 'estimator_'):
+            features = get_features_by_attr(model.estimator_)
+            # update remaining feature names
+            data.feature_names = [data.feature_names_orig[x] 
+                                  for x in model.get_support(indices=True)]
+    return sort_feature_scores(data, features) if features else []
 
 
 def run_config(args):
@@ -260,6 +269,5 @@ def run_config_space(pc, learner_config_space, get_val_results, baseline=False):
                                                 'mae': v.test_mae,
                                                 'mape': v.test_mape}}
                                         for x, v in val_results.items()],
-                'test_feature_scores': test_result.feature_scores,
-                'val_feature_scores': val_result.feature_scores
+                'feature_scores': test_result.feature_scores
             }

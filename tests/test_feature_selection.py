@@ -63,7 +63,8 @@ class TestFeatureScoring(TestCase):
         self.assertEqual(tuple(d.trainX[0].tolist()), (100, 20, 20, 100))
 
         # ensure relevant feature_names is left
-        self.assertEqual(tuple(d.feature_names), ('lag2', 'lag1', 'dim10', 'dim11'))
+        self.assertEqual(tuple(d.feature_names), 
+                         ('lag2', 'lag1', 'dim10', 'dim11'))
 
 
 class TestRfeFeatureSelectionForecast(TestCase):

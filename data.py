@@ -226,6 +226,8 @@ class Data2d(Data):
 
         if self.feature_selection > 0 and self.rfe_step == 0:
             self.select_features()
+        
+        self.feature_names_orig = deepcopy(self.feature_names)
 
     def pearson_r(self, x, y):
         c = [np.corrcoef(x[:, col_i], y)[0, 1] for col_i in range(x.shape[1])]
