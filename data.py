@@ -100,9 +100,9 @@ class Data:
         self.preprocess(df)
 
     def __str__(self):
-        return "trainX %s, trainY %s, valX %s, valY %s, testX %s, testY %s" % (
-            self.trainX.shape, self.trainY.shape, self.valX.shape,
-            self.valY.shape, self.testX.shape, self.testY.shape)
+        return f"trainX {self.trainX.shape}, trainY {self.trainY.shape}, " +\
+               f"valX {self.valX.shape}, valY {self.valY.shape}, " +\
+               f"testX {self.testX.shape}, testY {self.testY.shape}"
 
     def scale(self):
 
@@ -243,9 +243,9 @@ class Data2d(Data):
         num_sel = int((self.trainX.shape[1] - self.lags) * self.feature_selection)
         if num_sel == 0:
             raise Exception(
-                "Feature_selection=%.3f removes all features, review settings"
-                % self.feature_selection)
-        LOGGER.debug("Will select %d exog features" % num_sel)
+                f"Feature_selection={self.feature_selection} removes all "+
+                "features, review settings")
+        LOGGER.debug(f"Will select {num_sel} exog features")
 
         scores = self.pearson_r(self.trainX[:, self.lags:], self.trainY)
         selected = Counter(dict(zip(self.feature_names[self.lags:], scores))
@@ -253,7 +253,7 @@ class Data2d(Data):
 
         LOGGER.info("Selected features:")
         for i, (feature, score) in enumerate(selected):
-            LOGGER.info("%d\t%s\t%.6f" % (i, feature, score))
+            LOGGER.info(f"{i}\t{feature}\t{score}")
 
         # index of columns to be deleted
         name2id = list(zip(self.feature_names[self.lags:],
