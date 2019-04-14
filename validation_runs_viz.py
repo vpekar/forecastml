@@ -10,6 +10,7 @@ import json
 import pandas as pd
 from bokeh.plotting import figure, show
 from bokeh.layouts import gridplot
+from bokeh.io import output_file
 import settings
 
 
@@ -30,19 +31,21 @@ def chunks(alist, n):
 
 # select the test run:
 learner = sys.argv[1]
+entry_num = int(sys.argv[2]) #  the number of the entry
 assert learner in settings.__dict__
-dataset = "ise"
 score = 'mse'
 plots_per_row = 3
 
 test_results = json.load(open("results.json"))
 
+output_file("%s_val_hyperparams.html" % learner, title=learner)
+
 # get the requested entry
 entry = None
-for result in test_results:
-    if (result['learner'] == learner and
-        dataset in result['preproc_config']['data_file']):
+for i, result in enumerate(test_results):
+    if entry_num == i + 1:
         entry = result
+        break
 
 if not entry:
     raise("Could not find the required entry in the results. Check criteria?")
@@ -75,7 +78,7 @@ for param, best_val in entry['best_learner_config'].items():
         p = figure(title='%s, %s' % (learner, param), width=500, height=200)
         p.line(df['Value'].values, df['MSE'].values, line_width=1)
         p.circle(df['Value'].values, df['MSE'].values)
-    p.xaxis.axis_label = 'parameter value'
+    p.xaxis.axis_label = param
     p.yaxis.axis_label = 'RMSE'
     plots.append(p)
 

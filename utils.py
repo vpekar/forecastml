@@ -1,4 +1,3 @@
-
 import logging
 import warnings
 
@@ -9,7 +8,9 @@ import pandas as pd
 from scipy.ndimage.interpolation import shift
 from sklearn.metrics import mean_squared_error, mean_absolute_error
 
-from learner_configs import ConfigGB, ConfigLSTM
+from skater.core.explanations import Interpretation
+from skater.model import InMemoryModel
+
 from data import Data2d, Data3d
 
 
@@ -18,19 +19,42 @@ LOGGER = logging.getLogger('main.utils')
 
 class Result:
 
-    def __init__(self, train_mse, test_mse, train_mae, test_mae,
-                 train_mape, test_mape, yhat_is, yhat_oos,
-                 config_vals, feature_scores=()):
-        self.train_mse = train_mse
-        self.test_mse = test_mse
-        self.train_mae = train_mae
-        self.test_mae = test_mae
-        self.train_mape = train_mape
-        self.test_mape = test_mape
-        self.yhat_is = yhat_is
-        self.yhat_oos = yhat_oos
+    def __init__(self, config_vals):
         self.config_vals = tuple(config_vals.items())
-        self.feature_scores = feature_scores
+
+        self.train_mse_list = []
+        self.test_mse_list = []
+        self.train_mae_list = []
+        self.test_mae_list = []
+        self.train_mape_list = []
+        self.test_mape_list = []
+        self.yhat_is_list = []
+        self.yhat_oos_list = []
+        self.feature_scores_list = []
+        self.permuted_scores_list = []
+
+    def get_mean(self, alist):
+        a = np.array(alist)
+        return a.mean(), a.std()
+
+    def get_mean_counter(self, alist):
+        c = Counter()
+        for x in alist:
+            c.update(Counter(dict(x)))
+        num_counters = len(alist)
+        return [(x, y/num_counters) for x, y in c.most_common()]
+
+    def calc_means(self):
+        self.train_mse, self.train_mse_std = self.get_mean(self.train_mse_list)
+        self.test_mse, self.test_mse_std = self.get_mean(self.test_mse_list)
+        self.train_mae, self.train_mae_std = self.get_mean(self.train_mae_list)
+        self.test_mae, self.test_mae_std = self.get_mean(self.test_mae_list)
+        self.train_mape, self.train_mape_std = self.get_mean(self.train_mape_list)
+        self.test_mape, self.test_mape_std = self.get_mean(self.test_mape_list)
+        self.yhat_is = np.array(self.yhat_is_list).mean(axis=0)
+        self.yhat_oos = np.array(self.yhat_oos_list).mean(axis=0)
+        self.feature_scores = self.get_mean_counter(self.feature_scores_list)
+        self.permuted_scores = self.get_mean_counter(self.permuted_scores_list)
 
     def __str__(self):
         return "RMSE: %.3f MAE: %.3f MAPE: %.3f" % (self.test_mse,
@@ -39,12 +63,55 @@ class Result:
 
 
 def interpolate(df):
-    # interpolate data for missing dates
+    """Interpolate data for missing dates
+    """
     for x in df.columns:
         if x == "date":
             continue
         df[x] = df[x].interpolate(method='linear', axis=0).ffill().bfill()
     return df
+
+
+def sort_feature_scores(data, scores):
+    scores = np.array(scores).flatten()
+    assert len(data.feature_names) == len(scores)
+    return Counter(dict((x, y) for x, y in zip(data.feature_names, scores))
+                            ).most_common()
+
+
+def get_permuted_feature_scores(model, data):
+    """Computed permuted feature importances, using skater
+    """
+    interpreter = Interpretation(data.testX, feature_names=data.feature_names)
+    pyint_model = InMemoryModel(model.predict, examples=data.testX)
+    feature_scores = list(interpreter.feature_importance.feature_importance(
+        pyint_model, ascending=False, progressbar=False).items())
+    return feature_scores
+
+
+def get_feature_scores(model, data):
+    """Get feature scores from either feature importances or rankings
+    """
+    def get_features_by_attr(model):
+        for name in ['feature_importances_', 'coef_']:
+            if hasattr(model, name):
+                importances = getattr(model, name)
+                if not isinstance(importances, list):
+                    importances = importances.tolist()
+                return importances
+        return None
+
+    features = get_features_by_attr(model)
+    if features is None:
+        if hasattr(model, 'rankings_'):
+            features = sort_feature_scores(data, -model.rankings_)
+        elif hasattr(model, 'estimator_'):
+            features = get_features_by_attr(model.estimator_)
+            # update remaining feature names
+            data.feature_names = [data.feature_names_orig[x]
+                                  for x in model.get_support(indices=True)]
+
+    return sort_feature_scores(data, features) if features else []
 
 
 def run_config(args):
@@ -54,40 +121,38 @@ def run_config(args):
     """
     data, c, mode = args
 
-    if isinstance(c, (ConfigGB, ConfigLSTM)):
-        model = c.fit(data.trainX, data.trainY, data.valX, data.valY)
-    else:
-        model = c.fit(data.trainX, data.trainY)
+    result = Result(c.vals)
 
-    # in-sample
-    yhat_is = c.forecast(model, data.trainX)
-    train_mse = get_mse(data, yhat_is, "train")
-    train_mae = get_mae(data, yhat_is, "train")
-    train_mape = get_mape(data, yhat_is, "train")
+    for seed_number in range(c.pc['num_random_seeds']):
 
-    # out-of-sample
-    if mode == 'test':
-        yhat_oos = c.forecast(model, data.testX)
-    else:
-        yhat_oos = c.forecast(model, data.valX)
+        np.random.seed(seed_number)
+        c.pc['random_state'] = seed_number
+        model = c.train(data)
 
-    test_mse = get_mse(data, yhat_oos, mode)
-    test_mae = get_mae(data, yhat_oos, mode)
-    test_mape = get_mape(data, yhat_oos, mode)
+        # in-sample
+        yhat_is = c.forecast(model, data.trainX)
+        result.train_mse_list.append(get_mse(data, yhat_is, "train"))
+        result.train_mae_list.append(get_mae(data, yhat_is, "train"))
+        result.train_mape_list.append(get_mape(data, yhat_is, "train"))
+        result.yhat_is_list.append(yhat_is)
 
-    # feature importances
-    if hasattr(model, 'feature_importances_'):
-        assert len(data.feature_names) == len(model.feature_importances_)
-        feature_scores = Counter(dict((x, y)
-                                 for x, y in zip(data.feature_names,
-                                                 model.feature_importances_))
-                                ).most_common()
-    else:
-        feature_scores = []
+        # out-of-sample
+        yhat_oos = c.forecast(model, data.testX) if mode == 'test' \
+            else c.forecast(model, data.valX)
 
-    return Result(train_mse, test_mse, train_mae, test_mae,
-                  train_mape, test_mape, yhat_is, yhat_oos, c.vals,
-                  feature_scores)
+        result.test_mse_list.append(get_mse(data, yhat_oos, mode))
+        result.test_mae_list.append(get_mae(data, yhat_oos, mode))
+        result.test_mape_list.append(get_mape(data, yhat_oos, mode))
+        result.yhat_oos_list.append(yhat_oos)
+
+        feature_scores = get_feature_scores(model, data)
+        permuted_scores = []#get_permuted_feature_scores(model, data)
+        result.feature_scores_list.append(feature_scores)
+        result.permuted_scores_list.append(permuted_scores)
+
+    result.calc_means()
+
+    return result
 
 
 def get_mse(data, yhat, mode="train"):
@@ -110,7 +175,7 @@ def get_mape(data, yhat, mode="train"):
     """Mean Absolute Percentage Error
     """
     y = getattr(data, mode + "Yref")
-    y_flat = y.values.reshape((-1,))
+    y_flat = y.reshape((-1,))
     yhat_flat = data.revert(yhat, mode).flatten()
     with warnings.catch_warnings():
         warnings.filterwarnings('error')
@@ -120,25 +185,40 @@ def get_mape(data, yhat, mode="train"):
             return 0.0
 
 
-def separate_exogs(data, lags):
-    """Output two arrays, one with endogs and one with exogs
+def get_mda(data, yhat, mode="train"):
+    """Mean Directional Accuracy, as per:
+    https://www.wikiwand.com/en/Mean_Directional_Accuracy
     """
-    return data[:, :lags], data[:, lags:]
+    a = np.sign(np.diff(getattr(data, mode + "Yref")))
+    b = np.sign(np.diff(yhat))
+    return np.sum(a == b)/a.shape[0]
 
 
-def load_df(filename, date_format='%Y-%m-%d %H:%M:%S'):
-    return pd.read_csv(filename, index_col='date', parse_dates=['date'],
+def load_df(filename, date_format='%Y-%m-%d %H:%M:%S', eliminate_features=[]):
+    df = pd.read_csv(filename, index_col='date', parse_dates=['date'],
         date_parser=lambda x: pd.datetime.strptime(x, date_format))
+    for x in eliminate_features:
+        del df[x]
+    return df
 
 
-def prepare_data(pc, dim=None):
+def prepare_data(pc, dim=None, eliminate_features=[]):
     """
     :param config: preprocessing config
     """
-    df = load_df(pc['data_file'], pc['date_format'])
+    df = load_df(pc['data_file'], pc['date_format'],
+        eliminate_features=eliminate_features)
+
+    if pc.get('freq_threshold', 0) > 0:
+        # remove features with overall frequency below the threshold
+        cluster2freq = dict(zip(df.columns[:-1], df.sum(axis=0)[:-1]))
+        for cl_id, count in cluster2freq.items():
+            if count < pc['freq_threshold']:
+                del df[cl_id]
+
     df = interpolate(df)
     d = Data3d(df, pc) if dim == '3d' else Data2d(df, pc)
-    LOGGER.debug("Prepared data:\n%s" % d)
+    LOGGER.debug(f"Prepared data:\n{d}")
     return d
 
 
@@ -167,7 +247,7 @@ def do_baseline(d):
     train_mse, train_mae, train_mape = persistence_baseline(d, "train")
     val_mse, val_mae, val_mape = persistence_baseline(d, "val")
     test_mse, test_mae, test_mape = persistence_baseline(d, "test")
-    LOGGER.info("%.2f\t%.2f\t%.2f\t%.2f\t%.2f\t%.2f\t%.2f\t%.2f\t%.2f" % (
+    LOGGER.info("%.8f\t%.8f\t%.8f\t%.8f\t%.8f\t%.8f\t%.8f\t%.8f\t%.8f" % (
             train_mse, val_mse, test_mse, train_mae, val_mae, test_mae,
             train_mape, val_mape, test_mape))
     return
@@ -209,9 +289,13 @@ def run_config_space(pc, learner_config_space, get_val_results, baseline=False):
     # apply the best parameter config to the test set
     test_result = run_config([data, best_config, 'test'])
 
-    yhat_oos = data.revert(test_result.yhat_oos, "test").flatten().tolist()
-    yhat_is = data.revert(test_result.yhat_is, "train").flatten().tolist()
-    yhat_val = data.revert(val_result.yhat_oos, "val").flatten().tolist()
+    yhat_oos = data.revert(test_result.yhat_oos, "test", True)
+    yhat_is = data.revert(test_result.yhat_is, "train", True)
+    yhat_val = data.revert(val_result.yhat_oos, "val", True)
+
+    yhat_oos_list = [data.revert(x, "test", True) for x in test_result.yhat_oos_list]
+    yhat_is_list = [data.revert(x, "train", True) for x in test_result.yhat_is_list]
+    yhat_val_list = [data.revert(x, "val", True) for x in val_result.yhat_oos_list]
 
     LOGGER.info("Best config %s:\t%.3f\t%.3f\t%.3f\t%.3f\t%.3f\t%.3f\t%.3f\t%.3f\t%.3f\t%s" % (
         best_config.vals, test_result.train_mse, val_result.test_mse,
@@ -220,7 +304,7 @@ def run_config_space(pc, learner_config_space, get_val_results, baseline=False):
         test_result.test_mape, yhat_oos))
 
     LOGGER.info("Informative features:")
-    for k, v in test_result.feature_scores:
+    for k, v in test_result.feature_scores[:5]:
         LOGGER.info("%s: %.3f" % (k, v))
 
     return {
@@ -229,28 +313,73 @@ def run_config_space(pc, learner_config_space, get_val_results, baseline=False):
                 'learner': best_config.learner,
                 'best_learner_config': best_config.vals,
                 'mse': {
-                        'train': test_result.train_mse,
-                        'val': val_result.test_mse,
-                        'test': test_result.test_mse
+                        'train': {
+                            'mean': test_result.train_mse,
+                            'std': test_result.train_mse_std,
+                            'obs': test_result.train_mse_list
+                            },
+                        'val': {
+                            'mean': val_result.test_mse,
+                            'std': val_result.test_mse_std,
+                            'obs': val_result.test_mse_list,
+                            },
+                        'test': {
+                            'mean': test_result.test_mse,
+                            'std': test_result.test_mse_std,
+                            'obs': test_result.test_mse_list,
+                            }
                         },
                 'mae': {
-                        'train': test_result.train_mae,
-                        'val': val_result.test_mae,
-                        'test': test_result.test_mae
+                        'train': {
+                            'mean': test_result.train_mae,
+                            'std': test_result.train_mae_std,
+                            'obs': test_result.train_mae_list
+                            },
+                        'val': {
+                            'mean': val_result.test_mae,
+                            'std': val_result.test_mae_std,
+                            'obs': val_result.test_mae_list,
+                            },
+                        'test': {
+                            'mean': test_result.test_mae,
+                            'std': test_result.test_mae_std,
+                            'obs': test_result.test_mae_list,
+                            }
                         },
                 'mape': {
-                        'train': test_result.train_mape,
-                        'val': val_result.test_mape,
-                        'test': test_result.test_mape
+                        'train': {
+                            'mean': test_result.train_mape,
+                            'std': test_result.train_mape_std,
+                            'obs': test_result.train_mape_list
+                            },
+                        'val': {
+                            'mean': val_result.test_mape,
+                            'std': val_result.test_mape_std,
+                            'obs': val_result.test_mape_list,
+                            },
+                        'test': {
+                            'mean': test_result.test_mape,
+                            'std': test_result.test_mape_std,
+                            'obs': test_result.test_mape_list,
+                            }
                         },
-                'yhat_is': yhat_is,
-                'yhat_oos': yhat_oos,
-                'yhat_val': yhat_val,
+                'yhat_is': {
+                    'mean': yhat_is,
+                    'obs': yhat_is_list
+                    },
+                'yhat_oos': {
+                    'mean': yhat_oos,
+                    'obs': yhat_oos_list
+                    },
+                'yhat_val': {
+                    'mean': yhat_val,
+                    'obs': yhat_val_list
+                    },
                 'validation_runs': [{'config': dict(x),
                                      'scores': {'mse': v.test_mse,
                                                 'mae': v.test_mae,
                                                 'mape': v.test_mape}}
                                         for x, v in val_results.items()],
-                'test_feature_scores': test_result.feature_scores,
-                'val_feature_scores': val_result.feature_scores
+                'feature_scores': test_result.feature_scores,
+                'permuted_scores': test_result.permuted_scores
             }

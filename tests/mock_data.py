@@ -2,25 +2,26 @@ import pandas as pd
 from datetime import datetime, timedelta
 
 
-def get_preproc_config(lags=4, use_exog=False,
-                       detrend=False, deseason=False, difference=False,
-                       scale=[0, 1], horizon=7, feature_selection=0):
+def get_preproc_config(lags=4, use_exog=False, deseason=False, difference=False,
+                       scale=[0, 1], horizon=7, feature_selection=0,
+                       rfe_step=0, seasonal_period=7, random_state=None):
     adict = {
         "data_file": "infile",
         "date_format": "%Y-%m-%d",
         "test_split": 0.2,
         "difference": difference,
-        "predifference": False,
-        "detrend": detrend,
         "deseason": deseason,
-        "seasonal_period": 7,
+        "seasonal_period": seasonal_period,
         "horizon": horizon,
         "feature_selection": feature_selection,
+        "rfe_step": rfe_step,
         "use_exog": use_exog,
         "lags": lags,
         "scale_range": scale,
         "n_jobs": 1,
-        "random_state": 7
+        "dep_var_name": "dep_var",
+        "num_random_seeds": 3,
+        "random_state": random_state
     }
     return adict
 
@@ -31,7 +32,7 @@ def get_date_list(days=40):
 
 
 def get_df():
-    columns = ['dim0','dim1', 'dep_var']
+    columns = ['dim0', 'dim1', 'dep_var']
     idx = get_date_list()
     data = [[10, 11, 12],
             [20, 21, 22],
@@ -78,7 +79,7 @@ def get_df():
 
 
 def get_df2():
-    columns = ['dim0','dim1', 'dep_var']
+    columns = ['dim0', 'dim1', 'dep_var']
     data = [[5.1, 20, 100],
             [5.2, 100, 20],
             [5, 20, 100],
@@ -99,6 +100,35 @@ def get_df2():
             [5, 100, 20],
             [5, 20, 100],
             [5, 100, 20]]
+    idx = get_date_list(days=len(data))
+    df = pd.DataFrame(data=data, index=idx, columns=columns)
+    return df
+
+
+def get_df3():
+    """Deseasonalizing tests
+    """
+    columns = ['dim0', 'dim1', 'dep_var']
+    data = [[5.1, 20, 10],
+            [5.2, 100, 20],
+            [5, 20, 10],
+            [5, 100, 0],
+            [5, 20, 10],
+            [5, 100, 20],
+            [5, 20, 10],
+            [5, 100, 0],
+            [5, 20, 10],
+            [5, 100, 20],
+            [5, 20, 10],
+            [5, 100, 0],
+            [5, 20, 10],
+            [5, 100, 20],
+            [5, 20, 10],
+            [5.1, 100, 0],
+            [5.2, 20, 10],
+            [5, 100, 20],
+            [5, 20, 10],
+            [5, 100, 0]]
     idx = get_date_list(days=len(data))
     df = pd.DataFrame(data=data, index=idx, columns=columns)
     return df

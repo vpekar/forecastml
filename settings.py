@@ -3,17 +3,19 @@ PREPROCESSING = {
         "date_format": "%d/%m/%Y %H:%M:%S", # "%d-%b-%y",
         "test_split": 0.2,
         "difference": 0,
-        "predifference": 0,
-        "detrend": 0,
         "deseason": 0,
         "seasonal_period": 7,
         "horizon": 7,
         "feature_selection": 0,
+        "rfe_step": 0,
         "use_exog": 0,
         "lags": 7,
         "scale_range": [0, 1],
         "n_jobs": 2,
-        "random_state": 7
+        "freq_threshold": 0,
+        "dep_var_name": "dep_var",
+        "num_random_seeds": 10,
+        "random_state": None
         }
 
 

@@ -1,19 +1,22 @@
 # -*- coding: utf-8 -*-
 
-import unittest
 import logging
-from mock import Mock
+import numpy as np
+from unittest import TestCase
+from unittest.mock import Mock
 
 import utils
 import data
 from utils import prepare_data
+from learner_configs import ConfigSVR, ConfigGB, ConfigXGBoost
 from tests.mock_data import get_df, get_df2, get_preproc_config
+
 
 logging.getLogger("matplotlib").disabled = True
 logging.getLogger("tensorflow").disabled = True
 
 
-class TestFeatureSelection(unittest.TestCase):
+class TestFeatureSelection(TestCase):
 
     def setUp(self):
         try:
@@ -24,11 +27,11 @@ class TestFeatureSelection(unittest.TestCase):
             importlib.reload(data)
             importlib.reload(utils)
         utils.pd.read_csv = Mock(return_value=get_df())
-        data.Data2d.decompose = Mock()
         data.Data2d.scale = Mock()
 
     def test_select_features(self):
-        c = get_preproc_config(lags=2, use_exog=True, feature_selection=0.5)
+        c = get_preproc_config(lags=2, use_exog=True, feature_selection=0.5,
+            random_state=1)
         d = prepare_data(c)
 
         # keeping 4 features after selection: 2 original lags and 2 exogs
@@ -40,7 +43,7 @@ class TestFeatureSelection(unittest.TestCase):
         self.assertEqual(len(d.feature_names), 4)
 
 
-class TestFeatureScoring(unittest.TestCase):
+class TestFeatureScoring(TestCase):
 
     def setUp(self):
         try:
@@ -51,15 +54,104 @@ class TestFeatureScoring(unittest.TestCase):
             importlib.reload(data)
             importlib.reload(utils)
         utils.pd.read_csv = Mock(return_value=get_df2())
-        data.Data2d.decompose = Mock()
         data.Data2d.scale = Mock()
 
     def test_scoring(self):
-        c = get_preproc_config(lags=2, use_exog=True, feature_selection=0.5)
+        c = get_preproc_config(lags=2, use_exog=True, feature_selection=0.5,
+            random_state=1)
         d = prepare_data(c)
 
         # ensure that the lags + most informative exogs are kept
         self.assertEqual(tuple(d.trainX[0].tolist()), (100, 20, 20, 100))
 
         # ensure relevant feature_names is left
-        self.assertEqual(tuple(d.feature_names), ('lag2', 'lag1', 'dim10', 'dim11'))
+        self.assertEqual(tuple(d.feature_names),
+                         ('lag2', 'lag1', 'dim10', 'dim11'))
+
+
+class TestRfeFeatureSelectionForecast(TestCase):
+
+    def setUp(self):
+        try:
+            reload(data)
+            reload(utils)
+        except NameError:
+            import importlib
+            importlib.reload(data)
+            importlib.reload(utils)
+        utils.pd.read_csv = Mock(return_value=get_df())
+
+    def get_forecast(self, config, config_dict):
+        pc = get_preproc_config(lags=3, use_exog=True, horizon=1,
+                                feature_selection=0.5, rfe_step=1,
+                                random_state=1)
+        d = prepare_data(pc)
+        c = config(config_dict, pc)
+        model = c.train(d)
+        yhat = c.forecast(model, np.array([d.testX[0]]))
+        return yhat
+
+    def test_2d_svr(self):
+        yhat = self.get_forecast(ConfigSVR,
+            {'kernel': 'linear', 'degree': 1., 'c': 1., 'eps': 1.})
+        self.assertAlmostEqual(yhat.tolist()[0][0], 0.5, 1)
+
+    def test_2d_gb(self):
+        yhat = self.get_forecast(ConfigGB, {})
+        self.assertAlmostEqual(yhat.tolist()[0][0], 1.0, 1)
+
+    def test_2d_xgb(self):
+        yhat = self.get_forecast(ConfigXGBoost, {})
+        self.assertAlmostEqual(yhat.tolist()[0][0], 1.0, 1)
+
+    def test_2d_gb_with_early_stopping(self):
+        yhat = self.get_forecast(ConfigGB, {'early_stopping': 3})
+        self.assertAlmostEqual(yhat.tolist()[0][0], 1.0, 1)
+
+    def test_2d_xgb_with_early_stopping(self):
+        yhat = self.get_forecast(ConfigXGBoost, {'early_stopping': 3})
+        self.assertAlmostEqual(yhat.tolist()[0][0], 1.0, 1)
+
+
+class TestFeatureSelectionForecast(TestCase):
+
+    def setUp(self):
+        try:
+            reload(data)
+            reload(utils)
+        except NameError:
+            import importlib
+            importlib.reload(data)
+            importlib.reload(utils)
+        utils.pd.read_csv = Mock(return_value=get_df())
+
+    def get_forecast(self, config, config_dict):
+        pc = get_preproc_config(lags=3, use_exog=True, horizon=1,
+                                feature_selection=0.5, rfe_step=0,
+                                random_state=1)
+        d = prepare_data(pc)
+        c = config(config_dict, pc)
+        model = c.train(d)
+        yhat = c.forecast(model, np.array([d.testX[0]]))
+        return yhat
+
+    def test_2d_svr(self):
+        yhat = self.get_forecast(ConfigSVR,
+            {'kernel': 'linear', 'degree': 1., 'c': 1., 'eps': 1.})
+        self.assertAlmostEqual(yhat.tolist()[0][0], 0.5, 1)
+
+    def test_2d_gb(self):
+        yhat = self.get_forecast(ConfigGB, {})
+        self.assertAlmostEqual(yhat.tolist()[0][0], 1.0, 1)
+
+    def test_2d_xgb(self):
+        yhat = self.get_forecast(ConfigXGBoost, {})
+        self.assertAlmostEqual(yhat.tolist()[0][0], 1.0, 1)
+
+    def test_2d_gb_with_early_stopping(self):
+        yhat = self.get_forecast(ConfigGB, {'early_stopping': 3})
+        self.assertAlmostEqual(yhat.tolist()[0][0], 1.0, 1)
+
+    def test_2d_xgb_with_early_stopping(self):
+        yhat = self.get_forecast(ConfigXGBoost, {'early_stopping': 3})
+        self.assertAlmostEqual(yhat.tolist()[0][0], 1.0, 1)
