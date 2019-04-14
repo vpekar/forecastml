@@ -40,7 +40,7 @@ class GBWrapper(GradientBoostingRegressor):
              min_weight_fraction_leaf, max_depth, min_impurity_decrease,
              min_impurity_split, init, random_state, max_features, alpha,
              verbose, max_leaf_nodes, warm_start, presort)
- 
+
     def fit(self, x, y):
         if self.early_stopping:
             trainX, valX = x[:self.num_train, :], x[self.num_train:, :]

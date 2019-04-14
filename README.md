@@ -7,11 +7,11 @@ A Python package for running experiments with machine learning regressors on tim
 
 * Adaboost, Gradient Boosting, Random Forest, Support Vector, XGBoost, (bidirectional) LSTM regression algorithms
 
-* Detrending and seasonal decomposition using the STL algorithm
+* Seasonal decomposition
 
-* Informative feature selection
+* Feature selection using Pearson's _r_ and recursive feature elimination
 
-* In-sample and out-of-sample forecast evaluation in terms of RMSE, MAE, MAPE
+* In-sample and out-of-sample forecast evaluation in terms of RMSE, MAE, MAPE, Mean Directional Accuracy
 
 * Multiprocessing with the multiprocessing package
 
@@ -22,11 +22,44 @@ A Python package for running experiments with machine learning regressors on tim
 * Visualization of forecasted values
 
 
+## Experiment design
+
+Settings for preprocessing steps and the learning algorithms are specified in `settings.py`:
+
+* data_file: the input CSV file
+
+* date_format: the format of the date string in the input file, e.g., "%d-%b-%y"
+
+* test_split: the test-train ratio, e.g., 0.2
+
+* difference: if data (both dependent and explanatory variables) should be differenced, 0 or 1
+
+* deseason: if the dependent variable should de-seasonalized, 0 or 1
+
+* seasonal_period: the number of seasonal periods, e.g., 4 for quarterly seasons
+
+* horizon: the forecast horizon, e.g., 3
+
+* feature_selection: the proportion of features to select: e.g., 0.5; 0 - no feature selection
+
+* rfe_step: the percentage of features to remove at each iteration when using Recurrent Feature Selection, e.g., 0.1; 0 - do not use RFE
+
+* use_exog: if exogenous features should be used, 0 or 1
+
+* lags: the number of lags, e.g. 7
+
+* scale_range: the range to which all features should be scaled, e.g., [0, 1]
+
+* n_jobs: the number of parallel jobs, e.g., 2
+
+* random_state: the random seed value, e.g., 7
+
+
 ## Example usage
 
 **Multiprocessing**
 
-To run experiments with, e.g., AdaBoost, based on the settings for preprocessing and the learning algorithm specified in `settings.py`:
+To run experiments with, e.g., AdaBoost:
 
 ```
 $ python run.py AdaBoost
@@ -92,6 +125,8 @@ Produces plots with forecast values on the in-sample, validation, and out-of-sam
 
 * sklearn
 
+* tensorflow
+
 * statsmodels
 
 * bokeh
@@ -100,21 +135,15 @@ Produces plots with forecast values on the in-sample, validation, and out-of-sam
 
 * celery (optional, required only for distributed processing)
 
-* [stldecompose](https://github.com/jrmontag/STLDecompose) (optional, required only for seasonal decomposition and detrending)
-
 * [xgboost](http://xgboost.readthedocs.io/en/latest/python/python_intro.html) (optional, required only for XGBoost)
 
-* [keras](https://keras.io/) (optional, required only for LSTM)
-
-All the packages come installed with [Anaconda](https://conda.io/docs/user-guide/install/download.html), except celery, keras, stldecompose, and xgboost, which can be installed with conda or pip:
+All the packages come installed with [Anaconda](https://conda.io/docs/user-guide/install/download.html), except celery, tensorflow, and xgboost, which can be installed with conda or pip:
 
 ```
 $ conda install -c conda-forge celery
 $ conda install -c conda-forge xgboost
-$ pip install stldecompose
+$ conda install -c conda-forge tensorflow
 ```
-
-To install keras, follow these [instructions](https://keras.io/#installation).
 
 
 ## Run tests

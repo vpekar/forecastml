@@ -70,8 +70,8 @@ class Data:
         if config['deseason']:
             df[dep_var_name] = self._deseasonalize(df[dep_var_name],
                                                 config['seasonal_period'])
-        #self.df = df
         self.index = df.index
+
         # set original level Y's
         y_orig = deepcopy(df[dep_var_name])
         self.trainYref = y_orig[self.train_start+self.horizon-1:self.train_end].values
@@ -103,9 +103,9 @@ class Data:
         self.preprocess(df)
 
     def __str__(self):
-        return "trainX %s, trainY %s, valX %s, valY %s, testX %s, testY %s" % (
-            self.trainX.shape, self.trainY.shape, self.valX.shape,
-            self.valY.shape, self.testX.shape, self.testY.shape)
+        return f"trainX {self.trainX.shape}, trainY {self.trainY.shape}, " +\
+               f"valX {self.valX.shape}, valY {self.valY.shape}, " +\
+               f"testX {self.testX.shape}, testY {self.testY.shape}"
 
     def scale(self):
 
@@ -187,9 +187,6 @@ class Data2d(Data):
         val = vals[self.train_end:self.val_end]
         test = vals[self.val_end:]
         LOGGER.debug("input df shape %s" % str(df.shape))
-        #LOGGER.debug("train shape %s" % str(train.shape))
-        #LOGGER.debug("val shape %s" % str(val.shape))
-        #LOGGER.debug("test shape %s" % str(test.shape))
         return train, val, test
 
     def preprocess(self, df):
@@ -232,6 +229,8 @@ class Data2d(Data):
 
         self.feature_names_orig = deepcopy(self.feature_names)
 
+        self.feature_names_orig = deepcopy(self.feature_names)
+
     def pearson_r(self, x, y):
         c = [np.corrcoef(x[:, col_i], y)[0, 1] for col_i in range(x.shape[1])]
         c = np.abs(np.array(c))
@@ -248,17 +247,13 @@ class Data2d(Data):
         num_sel = int((self.trainX.shape[1] - self.lags) * self.feature_selection)
         if num_sel == 0:
             raise Exception(
-                "Feature_selection=%.3f removes all features, review settings"
-                % self.feature_selection)
-        LOGGER.debug("Will select %d exog features" % num_sel)
+                f"Feature_selection={self.feature_selection} removes all "+
+                "features, review settings")
+        LOGGER.debug(f"Will select {num_sel} exog features")
 
         scores = self.pearson_r(self.trainX[:, self.lags:], self.trainY)
         selected = Counter(dict(zip(self.feature_names[self.lags:], scores))
             ).most_common(num_sel)
-
-        #LOGGER.info("Selected features:")
-        #for i, (feature, score) in enumerate(selected):
-        #    LOGGER.info("%d\t%s\t%.6f" % (i, feature, score))
 
         # index of columns to be deleted
         name2id = list(zip(self.feature_names[self.lags:],

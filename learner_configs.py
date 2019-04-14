@@ -110,7 +110,7 @@ class Config:
             model = self.init_model()
         num = int(data.trainX.shape[1] * self.pc['feature_selection'])
         if num < 1:
-            raise Exception(f"There will be {num} after selection!, "+
+            raise Exception(f"There will be {num} features after selection!, "+
                 "change the feature_selection setting")
         LOGGER.debug("RFE will select %d features" % num)
         step = self.pc['rfe_step']
