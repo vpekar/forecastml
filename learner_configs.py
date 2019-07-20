@@ -281,9 +281,11 @@ class ConfigLSTM(Config):
         bias_regularizer = regularizers.L1L2(l1=self.bias_regularization[0],
                            l2=self.bias_regularization[1])
 
-        return_sequences_on_input = False if len(self.topology) == 2 else True
+        topology_depth = len(self.topology)
 
         # first layer
+        return_sequences_on_input = False if topology_depth == 2 else True
+
         if self.bidirectional:
             model.add(layers.Bidirectional(layers.LSTM(
                       units=self.topology[0],
@@ -303,20 +305,22 @@ class ConfigLSTM(Config):
         if self.dropout_rate:
             model.add(layers.Dropout(self.dropout_rate))
 
-        # other layers
-        for n_layer in self.topology[1:-1]:
+        # hidden layers
+        for i, n_layer in enumerate(self.topology[1:-1]):
+            return_seq = False if i == topology_depth - 3 else True
             if self.bidirectional:
                 model.add(layers.Bidirectional(layers.LSTM(
-                                    n_layer, return_sequences=False,
+                                    n_layer, return_sequences=return_seq,
                                     kernel_regularizer=kernel_regularizer,
                                     bias_regularizer=bias_regularizer)))
             else:
-                model.add(layers.LSTM(n_layer, return_sequences=False,
+                model.add(layers.LSTM(n_layer, return_sequences=return_seq,
                             kernel_regularizer=kernel_regularizer,
                             bias_regularizer=bias_regularizer))
             if self.dropout_rate:
                 model.add(layers.Dropout(self.dropout_rate))
 
+        # output layer
         model.add(layers.Dense(units=self.topology[-1]))
 
         model.compile(loss="mean_squared_error", optimizer=self.optimizer)
