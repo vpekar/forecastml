@@ -18,10 +18,14 @@ PREPROCESSING = {
         "random_state": None
         }
 
-
 ZMQ = {
        "master_address": "tcp://127.0.0.1:5557"
        }
+
+Lasso = {
+    "alpha": [0.0001, 0.001, 0.01, 0.1, 1, 1.5, 2],
+    "max_iter": [1000]
+}
 
 GB = {
         "n_estimators": [200, 300, 500, 700, 1000, 1500, 2000],

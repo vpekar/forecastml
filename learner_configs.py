@@ -11,6 +11,7 @@ from datetime import datetime
 from sklearn.svm.classes import SVR
 from sklearn.ensemble import AdaBoostRegressor
 from sklearn.ensemble import RandomForestRegressor
+from sklearn.linear_model import Lasso
 from sklearn.feature_selection import RFE
 
 from learner_wrappers import GBWrapper, XGBWrapper
@@ -78,6 +79,11 @@ class Config:
         self.learner = self.__class__.__name__.replace("Config", "")
         self.pc = pc
 
+        # for SVR, allow feature selection only for linear models
+        if (self.name == "SVR" and self.kernel != "linear" and
+            self.pc['feature_selection'] > 0):
+            raise Exception("For non-linear SVR, cannot use feature selection!")
+
     def __str__(self):
         return self.name
 
@@ -110,7 +116,7 @@ class Config:
             model = self.init_model()
         num = int(data.trainX.shape[1] * self.pc['feature_selection'])
         if num < 1:
-            raise Exception(f"There will be {num} features after selection!, "+
+            raise Exception(f"There will be {num} after selection!, "+
                 "change the feature_selection setting")
         LOGGER.debug("RFE will select %d features" % num)
         step = self.pc['rfe_step']
@@ -129,7 +135,10 @@ class Config:
         results = []
         horizon = self.pc['horizon']
         lags = self.pc['lags']
-        LOGGER.debug("Forecasting test: %s" % testX)
+        #LOGGER.debug("Forecasting test: %s" % testX)
+        n_forecast_success = 0
+        n_forecast_errors = 0
+        first_forecast_error = None
         for i in range(len(testX) - horizon + 1):
             for j in range(horizon):
                 instance = testX[i+j]
@@ -147,15 +156,33 @@ class Config:
                                                instance[end:]))
                 pred_val = model.predict(instance.reshape(1, -1))[0]
                 if np.isnan(pred_val) or pred_val < -1.0 or pred_val > 1.0:
-                    warnings.warn("Error forecasting %s, returning 0.5"
-                                  % instance.tolist())
+                    #warnings.warn("Error forecasting %s, returning 0.5"
+                    #              % instance.tolist())
+                    if first_forecast_error is None:
+                        first_forecast_error = instance.tolist()
+                    n_forecast_errors += 1
                     pred_val = 0.5
+                else:
+                    n_forecast_success += 1
                 buf.append(pred_val)
-                LOGGER.debug("Predicting with instance %s, result %s" %
-                      (instance, pred_val))
+                #LOGGER.debug("Predicting with instance %s, result %s" %
+                #      (instance, pred_val))
             results.append(pred_val)
 
+        if first_forecast_error is not None:
+            LOGGER.info(f"{n_forecast_success} successes and {n_forecast_errors} errors during forecasting")
+            LOGGER.debug(f"First instance with error: {first_forecast_error}")
+
         return np.array(results).reshape(-1, 1)
+
+
+class ConfigLasso(Config):
+
+    alpha = 0.1
+    max_iter = 1000
+
+    def init_model(self):
+        return Lasso(alpha=self.alpha, max_iter=self.max_iter)
 
 
 class ConfigSVR(Config):
@@ -281,11 +308,9 @@ class ConfigLSTM(Config):
         bias_regularizer = regularizers.L1L2(l1=self.bias_regularization[0],
                            l2=self.bias_regularization[1])
 
-        topology_depth = len(self.topology)
+        return_sequences_on_input = False if len(self.topology) == 2 else True
 
         # first layer
-        return_sequences_on_input = False if topology_depth == 2 else True
-
         if self.bidirectional:
             model.add(layers.Bidirectional(layers.LSTM(
                       units=self.topology[0],
@@ -305,22 +330,20 @@ class ConfigLSTM(Config):
         if self.dropout_rate:
             model.add(layers.Dropout(self.dropout_rate))
 
-        # hidden layers
-        for i, n_layer in enumerate(self.topology[1:-1]):
-            return_seq = False if i == topology_depth - 3 else True
+        # other layers
+        for n_layer in self.topology[1:-1]:
             if self.bidirectional:
                 model.add(layers.Bidirectional(layers.LSTM(
-                                    n_layer, return_sequences=return_seq,
+                                    n_layer, return_sequences=False,
                                     kernel_regularizer=kernel_regularizer,
                                     bias_regularizer=bias_regularizer)))
             else:
-                model.add(layers.LSTM(n_layer, return_sequences=return_seq,
+                model.add(layers.LSTM(n_layer, return_sequences=False,
                             kernel_regularizer=kernel_regularizer,
                             bias_regularizer=bias_regularizer))
             if self.dropout_rate:
                 model.add(layers.Dropout(self.dropout_rate))
 
-        # output layer
         model.add(layers.Dense(units=self.topology[-1]))
 
         model.compile(loss="mean_squared_error", optimizer=self.optimizer)
