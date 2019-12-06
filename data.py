@@ -6,7 +6,7 @@ from collections import Counter
 import numpy as np
 import pandas as pd
 
-from sklearn.preprocessing import MinMaxScaler
+from sklearn.preprocessing import MinMaxScaler, StandardScaler
 from statsmodels.tsa.seasonal import seasonal_decompose
 
 
@@ -30,6 +30,15 @@ def deseasonalize(train, test, n_periods):
     return train - train_seasonal, test - test_seasonal
 
 
+def get_scaler(scaler_name, scale_range):
+    if scaler_name == "standard":
+        return StandardScaler()
+    elif scale_range[0] != 0 or scale_range[1] != 0:
+        return MinMaxScaler(feature_range=scale_range)
+    else:
+        return None
+
+
 class Data:
 
     def __init__(self, df, config):
@@ -37,24 +46,32 @@ class Data:
         :param config: preprocessing config
         """
 
+        dep_var_name = config['dep_var_name']
+
         # options
+        if config.get('log_dep_var', False):
+            df[dep_var_name].replace(0, 10**-6, inplace=True)
+            df[dep_var_name] = np.log(df[log_dep_var])
+
+        if config.get('log_indep_var', False):
+            for x in df.columns:
+                if x != dep_var_name:
+                    df[x].replace(0, 10**-6, inplace=True)
+                    df[x] = np.log(df[x])
+
         # differenced values will not be reverted after testing
         if config['difference']:
             # both dependent and independent variables are differenced
             for x in df.columns:
                 df[x] = self._difference(deepcopy(df[x])).ravel()
 
-        dep_var_name = config['dep_var_name']
-
         self.use_exog = config['use_exog']
         self.lags = config['lags']
         self.test_split = config['test_split']
         self.horizon = config['horizon']
-        self.y_scaler = None
-        if config['scale_range'][0] != 0 or config['scale_range'][1] != 0:
-            self.y_scaler = MinMaxScaler(feature_range=config['scale_range'])
         self.scale_range = config['scale_range']
-
+        self.scaler_name = config['scaler_name']
+        self.y_scaler = get_scaler(self.scaler_name, self.scale_range)
         self.feature_selection = config['feature_selection']
         self.rfe_step = config['rfe_step']
 
@@ -70,8 +87,8 @@ class Data:
         if config['deseason']:
             df[dep_var_name] = self._deseasonalize(df[dep_var_name],
                                                 config['seasonal_period'])
+        #self.df = df
         self.index = df.index
-
         # set original level Y's
         y_orig = deepcopy(df[dep_var_name])
         self.trainYref = y_orig[self.train_start+self.horizon-1:self.train_end].values
@@ -81,7 +98,7 @@ class Data:
         # feature_names
         exog_names = deepcopy(df.columns).tolist()
         exog_names.remove(dep_var_name)
-        self.exog_names = ["%s%s" % (x, i) for i in range(self.lags)
+        self.exog_names = ["%s_%s" % (x, i) for i in range(self.lags)
                            for x in exog_names]
         self.feature_names = []
 
@@ -103,9 +120,9 @@ class Data:
         self.preprocess(df)
 
     def __str__(self):
-        return f"trainX {self.trainX.shape}, trainY {self.trainY.shape}, " +\
-               f"valX {self.valX.shape}, valY {self.valY.shape}, " +\
-               f"testX {self.testX.shape}, testY {self.testY.shape}"
+        return "trainX %s, trainY %s, valX %s, valY %s, testX %s, testY %s" % (
+            self.trainX.shape, self.trainY.shape, self.valX.shape,
+            self.valY.shape, self.testX.shape, self.testY.shape)
 
     def scale(self):
 
@@ -123,7 +140,7 @@ class Data:
         valxt = self.valX.T
         testxt = self.testX.T
         for i in range(trainxt.shape[0]):
-            x_scaler = MinMaxScaler(feature_range=self.scale_range)
+            x_scaler = get_scaler(self.scaler_name, self.scale_range)
             trainxt[i] = x_scaler.fit_transform(
                     trainxt[i].reshape(-1, 1)).reshape(-1,)
             valxt[i] = x_scaler.transform(
@@ -187,6 +204,9 @@ class Data2d(Data):
         val = vals[self.train_end:self.val_end]
         test = vals[self.val_end:]
         LOGGER.debug("input df shape %s" % str(df.shape))
+        #LOGGER.debug("train shape %s" % str(train.shape))
+        #LOGGER.debug("val shape %s" % str(val.shape))
+        #LOGGER.debug("test shape %s" % str(test.shape))
         return train, val, test
 
     def preprocess(self, df):
@@ -225,9 +245,8 @@ class Data2d(Data):
         self.scale()
 
         if self.feature_selection > 0 and self.rfe_step == 0:
+            # based on the pearson correlation!
             self.select_features()
-
-        self.feature_names_orig = deepcopy(self.feature_names)
 
         self.feature_names_orig = deepcopy(self.feature_names)
 
@@ -247,13 +266,17 @@ class Data2d(Data):
         num_sel = int((self.trainX.shape[1] - self.lags) * self.feature_selection)
         if num_sel == 0:
             raise Exception(
-                f"Feature_selection={self.feature_selection} removes all "+
-                "features, review settings")
-        LOGGER.debug(f"Will select {num_sel} exog features")
+                "Feature_selection=%.3f removes all features, review settings"
+                % self.feature_selection)
+        LOGGER.debug("Will select %d exog features" % num_sel)
 
         scores = self.pearson_r(self.trainX[:, self.lags:], self.trainY)
         selected = Counter(dict(zip(self.feature_names[self.lags:], scores))
             ).most_common(num_sel)
+
+        #LOGGER.info("Selected features:")
+        #for i, (feature, score) in enumerate(selected):
+        #    LOGGER.info("%d\t%s\t%.6f" % (i, feature, score))
 
         # index of columns to be deleted
         name2id = list(zip(self.feature_names[self.lags:],
@@ -299,7 +322,7 @@ class Data3d(Data):
         valxt = self.valX.T
         testxt = self.testX.T
         for i in range(trainxt.shape[0]):
-            x_scaler = MinMaxScaler(feature_range=self.scale_range)
+            x_scaler = get_scaler(self.scaler_name, self.scale_range)
             trainxt[i] = x_scaler.fit_transform(
                     trainxt[i].ravel().reshape(-1, 1)).reshape(
                             trainxt.shape[1], trainxt.shape[2])

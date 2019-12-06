@@ -123,7 +123,14 @@ def run_config(args):
 
     result = Result(c.vals)
 
-    for seed_number in range(c.pc['num_random_seeds']):
+    # if num_random_seeds == 0 (i.e., the function is then used by
+    # emp_intervals_viz.py), then use the passed random state, don't change it
+    if c.pc['num_random_seeds'] == 0:
+        iter_range = range(c.pc['random_state'], c.pc['random_state']+1)
+    else:
+        iter_range = range(c.pc['num_random_seeds'])
+
+    for seed_number in iter_range:
 
         np.random.seed(seed_number)
         c.pc['random_state'] = seed_number

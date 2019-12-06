@@ -8,7 +8,7 @@ import utils
 import data
 from utils import run_config
 from utils import prepare_data
-from learner_configs import ConfigLSTM, ConfigSVR
+from learner_configs import ConfigLSTM, ConfigLSVR
 
 from tests.mock_data import get_df, get_preproc_config
 
@@ -21,7 +21,7 @@ def get_model(d, ret_val=[1.0]):
 
 
 def get_mock_svr(d, pc):
-    mockConfigSVR = create_autospec(ConfigSVR)
+    mockConfigSVR = create_autospec(ConfigLSVR)
     side_effect = lambda x, y: np.array([.1]*y.shape[0])
     mockConfigSVR.forecast = Mock(side_effect=side_effect)
     mockConfigSVR.train = Mock(return_value=get_model(d))

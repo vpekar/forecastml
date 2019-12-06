@@ -4,7 +4,7 @@ from unittest import TestCase
 from unittest.mock import Mock
 import numpy as np
 
-from learner_configs import ConfigLSTM, ConfigSVR
+from learner_configs import ConfigLSTM, ConfigLSVR
 
 from tests.mock_data import get_preproc_config
 
@@ -28,7 +28,7 @@ class TestConfig2d(TestCase):
             ])
 
         pc = get_preproc_config(lags=3, horizon=1)
-        c = ConfigSVR({'kernel': 'rbf', 'degree': 1., 'c': 1., 'eps': 1.}, pc)
+        c = ConfigLSVR({'c': 1., 'eps': 1.}, pc)
 
         yhat = c.forecast(model, testX)
         self.assertEqual(yhat.tolist(), [[1], [1], [1], [1], [1], [1]])
@@ -46,7 +46,7 @@ class TestConfig2d(TestCase):
             ])
 
         pc = get_preproc_config(lags=3, horizon=5)
-        c = ConfigSVR({'kernel': 'rbf', 'degree': 1., 'c': 1., 'eps': 1.}, pc)
+        c = ConfigLSVR({'c': 1., 'eps': 1.}, pc)
 
         yhat = c.forecast(model, testX)
         self.assertEqual(yhat.tolist(), [[1], [1]])
@@ -69,7 +69,7 @@ class TestConfig2d(TestCase):
             ])
 
         pc = get_preproc_config(lags=3, horizon=2, use_exog=True)
-        c = ConfigSVR({'kernel': 'rbf', 'degree': 1., 'c': 1., 'eps': 1.}, pc)
+        c = ConfigLSVR({'c': 1., 'eps': 1.}, pc)
 
         yhat = c.forecast(model, testX)
         calls = model.predict.call_args_list

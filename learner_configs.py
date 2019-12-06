@@ -9,8 +9,11 @@ from copy import deepcopy
 from datetime import datetime
 
 from sklearn.svm.classes import SVR
+from sklearn.svm import LinearSVR
 from sklearn.ensemble import AdaBoostRegressor
 from sklearn.ensemble import RandomForestRegressor
+from sklearn.linear_model import Lasso
+from sklearn.neighbors import KNeighborsRegressor
 from sklearn.feature_selection import RFE
 
 from learner_wrappers import GBWrapper, XGBWrapper
@@ -78,6 +81,11 @@ class Config:
         self.learner = self.__class__.__name__.replace("Config", "")
         self.pc = pc
 
+        # for SVR, allow feature selection only for linear models
+        if (self.name in ["SVRpoly", "SVRrbf", "SVRsigmoid"] and
+            self.pc['feature_selection'] > 0):
+            raise Exception("For non-linear SVR, cannot use feature selection!")
+
     def __str__(self):
         return self.name
 
@@ -110,7 +118,7 @@ class Config:
             model = self.init_model()
         num = int(data.trainX.shape[1] * self.pc['feature_selection'])
         if num < 1:
-            raise Exception(f"There will be {num} features after selection!, "+
+            raise Exception(f"There will be {num} after selection!, "+
                 "change the feature_selection setting")
         LOGGER.debug("RFE will select %d features" % num)
         step = self.pc['rfe_step']
@@ -129,7 +137,10 @@ class Config:
         results = []
         horizon = self.pc['horizon']
         lags = self.pc['lags']
-        LOGGER.debug("Forecasting test: %s" % testX)
+        #LOGGER.debug("Forecasting test: %s" % testX)
+        n_forecast_success = 0
+        n_forecast_errors = 0
+        first_forecast_error = None
         for i in range(len(testX) - horizon + 1):
             for j in range(horizon):
                 instance = testX[i+j]
@@ -147,27 +158,96 @@ class Config:
                                                instance[end:]))
                 pred_val = model.predict(instance.reshape(1, -1))[0]
                 if np.isnan(pred_val) or pred_val < -1.0 or pred_val > 1.0:
-                    warnings.warn("Error forecasting %s, returning 0.5"
-                                  % instance.tolist())
+                    #warnings.warn("Error forecasting %s, returning 0.5"
+                    #              % instance.tolist())
+                    if first_forecast_error is None:
+                        first_forecast_error = instance.tolist()
+                    n_forecast_errors += 1
                     pred_val = 0.5
+                else:
+                    n_forecast_success += 1
                 buf.append(pred_val)
-                LOGGER.debug("Predicting with instance %s, result %s" %
-                      (instance, pred_val))
+                #LOGGER.debug("Predicting with instance %s, result %s" %
+                #      (instance, pred_val))
             results.append(pred_val)
+
+        if first_forecast_error is not None:
+            LOGGER.info(f"{n_forecast_success} successes and {n_forecast_errors} errors during forecasting")
+            LOGGER.debug(f"First instance with error: {first_forecast_error}")
 
         return np.array(results).reshape(-1, 1)
 
 
-class ConfigSVR(Config):
+class ConfigLasso(Config):
 
-    kernel = 'linear'
-    degree = 3
-    c = 1.0
-    eps = 0.1
+    alpha = 0.1
+    max_iter = 1000
 
     def init_model(self):
-        return SVR(kernel=self.kernel, degree=self.degree, C=self.c,
-                    epsilon=self.eps)
+        return Lasso(alpha=self.alpha, max_iter=self.max_iter)
+
+
+class ConfigKNN(Config):
+
+    n_neighbors = 5
+    p = 2
+
+    def init_model(self):
+        return KNeighborsRegressor(n_neighbors=self.n_neighbors, p=self.p)
+
+
+class ConfigSVR(Config):
+
+    c = 1.0
+    eps = 0.1
+    tol = 0.0001
+    dual = True
+
+
+class ConfigLSVR(ConfigSVR):
+
+    max_iter = 1000
+
+    def init_model(self):
+        return LinearSVR(C=self.c, epsilon=self.eps, tol=self.tol, max_iter=
+            self.max_iter, dual=self.dual)
+
+
+class ConfigSVRpoly(ConfigSVR):
+
+    degree = 3
+    coef0 = 0.0
+    gamma = "scale"
+    max_iter = -1
+
+    def init_model(self):
+        return SVR(kernel="poly", degree=self.degree, C=self.c,
+            epsilon=self.eps, tol=self.tol, max_iter=self.max_iter,
+            dual=self.dual, coef0=self.coef, gamma=self.gamma)
+
+
+class ConfigSVRsigmoid(ConfigSVR):
+
+    coef0 = 0
+    gamma = "scale"
+    max_iter = -1
+
+    def init_model(self):
+        return SVR(kernel="sigmoid", degree=self.degree, C=self.c,
+            epsilon=self.eps, tol=self.tol, max_iter=self.max_iter,
+            dual=self.dual, coef0=self.coef, gamma=self.gamma)
+
+
+class ConfigSVRrbf(ConfigSVR):
+
+    gamma = "scale"
+    max_iter = -1
+
+    def init_model(self):
+        return SVR(kernel="rbf", degree=self.degree, C=self.c,
+            epsilon=self.eps, tol=self.tol, max_iter=self.max_iter,
+            dual=self.dual, gamma=self.gamma)
+
 
 
 class ConfigAdaBoost(Config):

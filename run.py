@@ -16,9 +16,7 @@ from get_logger import get_logger
 from learner_configs import ConfigSpace
 
 
-learner = sys.argv[1]
-assert learner in settings.__dict__
-LOGGER = get_logger('main', 'logs/%s.log' % learner)
+LOGGER = None
 
 
 def get_val_results(d, learner_config_space, pc):
@@ -80,4 +78,7 @@ def main():
 
 
 if __name__ == "__main__":
+    learner = sys.argv[1]
+    assert learner in settings.__dict__
+    LOGGER = get_logger('main', 'logs/%s.log' % learner)
     main()

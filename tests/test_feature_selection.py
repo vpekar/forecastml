@@ -8,7 +8,7 @@ from unittest.mock import Mock
 import utils
 import data
 from utils import prepare_data
-from learner_configs import ConfigSVR, ConfigGB, ConfigXGBoost
+from learner_configs import ConfigLSVR, ConfigGB, ConfigXGBoost
 from tests.mock_data import get_df, get_df2, get_preproc_config
 
 
@@ -66,7 +66,7 @@ class TestFeatureScoring(TestCase):
 
         # ensure relevant feature_names is left
         self.assertEqual(tuple(d.feature_names),
-                         ('lag2', 'lag1', 'dim10', 'dim11'))
+                         ('lag2', 'lag1', 'dim1_0', 'dim1_1'))
 
 
 class TestRfeFeatureSelectionForecast(TestCase):
@@ -92,9 +92,8 @@ class TestRfeFeatureSelectionForecast(TestCase):
         return yhat
 
     def test_2d_svr(self):
-        yhat = self.get_forecast(ConfigSVR,
-            {'kernel': 'linear', 'degree': 1., 'c': 1., 'eps': 1.})
-        self.assertAlmostEqual(yhat.tolist()[0][0], 0.5, 1)
+        yhat = self.get_forecast(ConfigLSVR, {'c': 1., 'eps': 1.})
+        self.assertAlmostEqual(yhat.tolist()[0][0], 0.0, 1)
 
     def test_2d_gb(self):
         yhat = self.get_forecast(ConfigGB, {})
@@ -136,9 +135,8 @@ class TestFeatureSelectionForecast(TestCase):
         return yhat
 
     def test_2d_svr(self):
-        yhat = self.get_forecast(ConfigSVR,
-            {'kernel': 'linear', 'degree': 1., 'c': 1., 'eps': 1.})
-        self.assertAlmostEqual(yhat.tolist()[0][0], 0.5, 1)
+        yhat = self.get_forecast(ConfigLSVR, {'c': 1., 'eps': 1.})
+        self.assertAlmostEqual(yhat.tolist()[0][0], 0.0, 1)
 
     def test_2d_gb(self):
         yhat = self.get_forecast(ConfigGB, {})
