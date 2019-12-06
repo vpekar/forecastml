@@ -5,7 +5,7 @@ A Python package for running experiments with machine learning regressors on tim
 
 ## Features
 
-* Adaboost, Gradient Boosting, Random Forest, Support Vector, XGBoost, (bidirectional) LSTM regression algorithms
+* Lasso, Knn, Adaboost, Gradient Boosting, Random Forest, Support Vector, XGBoost, (bidirectional) LSTM regression algorithms
 
 * Seasonal decomposition
 
