@@ -12,7 +12,7 @@ from sklearn.svm.classes import SVR
 from sklearn.svm import LinearSVR
 from sklearn.ensemble import AdaBoostRegressor
 from sklearn.ensemble import RandomForestRegressor
-from sklearn.linear_model import Lasso
+from sklearn.linear_model import Lasso, ElasticNet
 from sklearn.neighbors import KNeighborsRegressor
 from sklearn.feature_selection import RFE
 
@@ -157,7 +157,7 @@ class Config:
                     instance = np.concatenate((instance[:start], buf,
                                                instance[end:]))
                 pred_val = model.predict(instance.reshape(1, -1))[0]
-                if np.isnan(pred_val) or pred_val < -1.0 or pred_val > 1.0:
+                if np.isnan(pred_val):
                     #warnings.warn("Error forecasting %s, returning 0.5"
                     #              % instance.tolist())
                     if first_forecast_error is None:
@@ -187,6 +187,30 @@ class ConfigLasso(Config):
         return Lasso(alpha=self.alpha, max_iter=self.max_iter)
 
 
+class ConfigElasticNet(Config):
+
+    alpha = 0.1
+    l1_ratio = 0.5
+    max_iter = 1000
+    tol = 0.001
+
+    def init_model(self):
+        return ElasticNet(alpha=self.alpha, l1_ratio=self.l1_ratio,
+            max_iter=self.max_iter, tol=self.tol)
+
+
+class ConfigKernelRidge(Config):
+
+    alpha = 1.0
+    kernel = "poly"
+    degree = 3
+    coef0 = 1
+
+    def init_model(self):
+        return ElasticNet(alpha=self.alpha, l1_ratio=self.l1_ratio,
+            max_iter=self.max_iter, tol=self.tol)
+
+
 class ConfigKNN(Config):
 
     n_neighbors = 5
@@ -201,12 +225,12 @@ class ConfigSVR(Config):
     c = 1.0
     eps = 0.1
     tol = 0.0001
-    dual = True
 
 
 class ConfigLSVR(ConfigSVR):
 
     max_iter = 1000
+    dual = True
 
     def init_model(self):
         return LinearSVR(C=self.c, epsilon=self.eps, tol=self.tol, max_iter=
@@ -223,7 +247,7 @@ class ConfigSVRpoly(ConfigSVR):
     def init_model(self):
         return SVR(kernel="poly", degree=self.degree, C=self.c,
             epsilon=self.eps, tol=self.tol, max_iter=self.max_iter,
-            dual=self.dual, coef0=self.coef, gamma=self.gamma)
+            coef0=self.coef0, gamma=self.gamma)
 
 
 class ConfigSVRsigmoid(ConfigSVR):
@@ -233,9 +257,8 @@ class ConfigSVRsigmoid(ConfigSVR):
     max_iter = -1
 
     def init_model(self):
-        return SVR(kernel="sigmoid", degree=self.degree, C=self.c,
-            epsilon=self.eps, tol=self.tol, max_iter=self.max_iter,
-            dual=self.dual, coef0=self.coef, gamma=self.gamma)
+        return SVR(kernel="sigmoid", C=self.c, epsilon=self.eps, tol=self.tol,
+            max_iter=self.max_iter, coef0=self.coef0, gamma=self.gamma)
 
 
 class ConfigSVRrbf(ConfigSVR):
@@ -244,9 +267,8 @@ class ConfigSVRrbf(ConfigSVR):
     max_iter = -1
 
     def init_model(self):
-        return SVR(kernel="rbf", degree=self.degree, C=self.c,
-            epsilon=self.eps, tol=self.tol, max_iter=self.max_iter,
-            dual=self.dual, gamma=self.gamma)
+        return SVR(kernel="rbf", C=self.c, epsilon=self.eps, tol=self.tol,
+            max_iter=self.max_iter, gamma=self.gamma)
 
 
 
@@ -361,9 +383,11 @@ class ConfigLSTM(Config):
         bias_regularizer = regularizers.L1L2(l1=self.bias_regularization[0],
                            l2=self.bias_regularization[1])
 
-        return_sequences_on_input = False if len(self.topology) == 2 else True
+        topology_depth = len(self.topology)
 
         # first layer
+        return_sequences_on_input = False if topology_depth == 2 else True
+
         if self.bidirectional:
             model.add(layers.Bidirectional(layers.LSTM(
                       units=self.topology[0],
@@ -383,20 +407,22 @@ class ConfigLSTM(Config):
         if self.dropout_rate:
             model.add(layers.Dropout(self.dropout_rate))
 
-        # other layers
-        for n_layer in self.topology[1:-1]:
+        # hidden layers
+        for i, n_layer in enumerate(self.topology[1:-1]):
+            return_seq = False if i == topology_depth - 3 else True
             if self.bidirectional:
                 model.add(layers.Bidirectional(layers.LSTM(
-                                    n_layer, return_sequences=False,
+                                    n_layer, return_sequences=return_seq,
                                     kernel_regularizer=kernel_regularizer,
                                     bias_regularizer=bias_regularizer)))
             else:
-                model.add(layers.LSTM(n_layer, return_sequences=False,
+                model.add(layers.LSTM(n_layer, return_sequences=return_seq,
                             kernel_regularizer=kernel_regularizer,
                             bias_regularizer=bias_regularizer))
             if self.dropout_rate:
                 model.add(layers.Dropout(self.dropout_rate))
 
+        # output layer
         model.add(layers.Dense(units=self.topology[-1]))
 
         model.compile(loss="mean_squared_error", optimizer=self.optimizer)
