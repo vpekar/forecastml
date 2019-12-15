@@ -22,6 +22,7 @@ def get_model(d, ret_val=[1.0]):
 
 def get_mock_svr(d, pc):
     mockConfigSVR = create_autospec(ConfigLSVR)
+    mockConfigSVR.name = "SVR"
     side_effect = lambda x, y: np.array([.1]*y.shape[0])
     mockConfigSVR.forecast = Mock(side_effect=side_effect)
     mockConfigSVR.train = Mock(return_value=get_model(d))
@@ -32,6 +33,7 @@ def get_mock_svr(d, pc):
 
 def get_mock_lstm(d, pc):
     mockConfigLSTM = create_autospec(ConfigLSTM)
+    mockConfigLSTM.name = "LSTM"
     mockConfigLSTM.train = Mock(return_value=get_model(d, [[1.0]]))
     side_effect = lambda x, y: np.array([.1]*y.shape[0])
     mockConfigLSTM.forecast = Mock(side_effect=side_effect)
@@ -110,6 +112,8 @@ class TestRunConfig(TestCase):
         pc = get_preproc_config(lags=3, horizon=1)
         d = prepare_data(pc, dim="3d")
         mockConfigLSTM = get_mock_lstm(d, pc)
+
+        print(mockConfigLSTM.__class__.__dict__.keys())
 
         r = run_config([d, mockConfigLSTM, 'val'])
 

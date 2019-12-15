@@ -3,54 +3,7 @@
 """Wrappers around GB and XGB estimators to make them usable with RFE
 """
 
-from sklearn.ensemble import GradientBoostingRegressor
 from xgboost import XGBRegressor
-
-from early_stopping import Monitor
-
-
-class GBWrapper(GradientBoostingRegressor):
-
-    num_train_instances = 0
-    early_stopping = None
-
-    def __init__(self, loss='ls', learning_rate=0.1, n_estimators=100,
-                 subsample=1.0, criterion='friedman_mse', min_samples_split=2,
-                 min_samples_leaf=1, min_weight_fraction_leaf=0.,
-                 max_depth=3, min_impurity_decrease=0.,
-                 min_impurity_split=None, init=None, random_state=None,
-                 max_features=None, alpha=0.9, verbose=0, max_leaf_nodes=None,
-                 warm_start=False, presort='auto', validation_fraction=0.1,
-                 n_iter_no_change=None, tol=1e-4,
-                 early_stopping=None, num_train=0):
-        self.early_stopping = early_stopping
-        self.num_train = num_train
-        try:
-            # scikit-learn>=0.20.1
-            super().__init__(loss, learning_rate, n_estimators, subsample,
-             criterion, min_samples_split, min_samples_leaf,
-             min_weight_fraction_leaf, max_depth, min_impurity_decrease,
-             min_impurity_split, init, random_state, max_features, alpha,
-             verbose, max_leaf_nodes, warm_start, presort, validation_fraction,
-             n_iter_no_change, tol)
-        except TypeError:
-            # scikit-learn<=0.19.2
-            super().__init__(loss, learning_rate, n_estimators, subsample,
-             criterion, min_samples_split, min_samples_leaf,
-             min_weight_fraction_leaf, max_depth, min_impurity_decrease,
-             min_impurity_split, init, random_state, max_features, alpha,
-             verbose, max_leaf_nodes, warm_start, presort)
-
-    def fit(self, x, y):
-        if self.early_stopping:
-            trainX, valX = x[:self.num_train, :], x[self.num_train:, :]
-            trainY, valY = y[:self.num_train], y[self.num_train:]
-            super().fit(trainX, trainY,
-                  monitor=Monitor(valX.astype("float32"),
-                                  valY.astype("float32"),
-                                  max_consecutive_decreases=self.early_stopping))
-        else:
-            super().fit(x, y)
 
 
 class XGBWrapper(XGBRegressor):

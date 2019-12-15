@@ -105,7 +105,7 @@ class TestRfeFeatureSelectionForecast(TestCase):
 
     def test_2d_gb_with_early_stopping(self):
         yhat = self.get_forecast(ConfigGB, {'early_stopping': 3})
-        self.assertAlmostEqual(yhat.tolist()[0][0], 1.0, 1)
+        self.assertAlmostEqual(yhat.tolist()[0][0], 1.3, 1)
 
     def test_2d_xgb_with_early_stopping(self):
         yhat = self.get_forecast(ConfigXGBoost, {'early_stopping': 3})
@@ -148,7 +148,7 @@ class TestFeatureSelectionForecast(TestCase):
 
     def test_2d_gb_with_early_stopping(self):
         yhat = self.get_forecast(ConfigGB, {'early_stopping': 3})
-        self.assertAlmostEqual(yhat.tolist()[0][0], 1.0, 1)
+        self.assertAlmostEqual(yhat.tolist()[0][0], 1.3, 1)
 
     def test_2d_xgb_with_early_stopping(self):
         yhat = self.get_forecast(ConfigXGBoost, {'early_stopping': 3})

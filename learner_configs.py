@@ -12,11 +12,14 @@ from sklearn.svm.classes import SVR
 from sklearn.svm import LinearSVR
 from sklearn.ensemble import AdaBoostRegressor
 from sklearn.ensemble import RandomForestRegressor
+from sklearn.ensemble import GradientBoostingRegressor
 from sklearn.linear_model import Lasso, ElasticNet
+from sklearn.kernel_ridge import KernelRidge
 from sklearn.neighbors import KNeighborsRegressor
 from sklearn.feature_selection import RFE
+from sklearn.preprocessing import PolynomialFeatures
 
-from learner_wrappers import GBWrapper, XGBWrapper
+from learner_wrappers import XGBWrapper
 
 from tensorflow.keras import models
 from tensorflow.keras import layers
@@ -86,6 +89,11 @@ class Config:
             self.pc['feature_selection'] > 0):
             raise Exception("For non-linear SVR, cannot use feature selection!")
 
+        if pc['poly_degree'] > 0:
+            self.poly_features = PolynomialFeatures(pc['poly_degree'], interaction_only=True)
+        else:
+            self.poly_features = None
+
     def __str__(self):
         return self.name
 
@@ -102,10 +110,16 @@ class Config:
                                     num_train=data.trainX.shape[0])
             x = np.concatenate((data.trainX, data.valX))
             y = np.concatenate((data.trainY, data.valY))
-            model.fit(x, y)
         else:
             model = self.init_model()
-            model.fit(data.trainX, data.trainY)
+            x, y = data.trainX, data.trainY
+
+        if self.poly_features:
+            LOGGER.info("Fitting polynomial features ...")
+            model.fit(self.poly_features.fit_transform(x), y)
+        else:
+            model.fit(x, y)
+
         return model
 
     def rfe_fit(self, data):
@@ -156,7 +170,11 @@ class Config:
                     end = start + buf_len
                     instance = np.concatenate((instance[:start], buf,
                                                instance[end:]))
-                pred_val = model.predict(instance.reshape(1, -1))[0]
+                if self.poly_features:
+                    poly_instance = self.poly_features.transform(instance.reshape(1, -1))
+                    pred_val = model.predict(poly_instance)[0]
+                else:
+                    pred_val = model.predict(instance.reshape(1, -1))[0]
                 if np.isnan(pred_val):
                     #warnings.warn("Error forecasting %s, returning 0.5"
                     #              % instance.tolist())
@@ -207,8 +225,8 @@ class ConfigKernelRidge(Config):
     coef0 = 1
 
     def init_model(self):
-        return ElasticNet(alpha=self.alpha, l1_ratio=self.l1_ratio,
-            max_iter=self.max_iter, tol=self.tol)
+        return KernelRidge(alpha=self.alpha, kernel=self.kernel,
+            degree=self.degree, coef0=self.coef0)
 
 
 class ConfigKNN(Config):
@@ -319,7 +337,7 @@ class ConfigGB(Config):
     early_stopping = None
 
     def init_model(self, early_stopping=None, num_train=None):
-        return GBWrapper(n_estimators=self.n_estimators,
+        return GradientBoostingRegressor(n_estimators=self.n_estimators,
             learning_rate=self.learning_rate, loss=self.loss,
             max_features=self.max_features, max_depth=self.max_depth,
             min_samples_split=self.min_samples_split,
@@ -329,7 +347,7 @@ class ConfigGB(Config):
             subsample=self.subsample, alpha=self.alpha,
             warm_start=self.warm_start,
             random_state=self.pc['random_state'],
-            early_stopping=early_stopping, num_train=num_train)
+            n_iter_no_change=self.early_stopping)
 
 
 class ConfigXGBoost(Config):

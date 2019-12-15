@@ -22,6 +22,7 @@ def get_preproc_config(lags=4, use_exog=False, deseason=False, difference=False,
         "n_jobs": 1,
         "dep_var_name": "dep_var",
         "num_random_seeds": 3,
+        "poly_degree": 0,
         "random_state": random_state
     }
     return adict
