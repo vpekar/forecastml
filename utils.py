@@ -138,7 +138,8 @@ def run_config(args):
 
         # in-sample
         yhat_is = c.forecast(model, data.trainX)
-        result.train_mse_list.append(get_mse(data, yhat_is, "train"))
+        mse_train = get_mse(data, yhat_is, "train")
+        result.train_mse_list.append(mse_train)
         result.train_mae_list.append(get_mae(data, yhat_is, "train"))
         result.train_mape_list.append(get_mape(data, yhat_is, "train"))
         result.yhat_is_list.append(yhat_is)
@@ -147,12 +148,17 @@ def run_config(args):
         yhat_oos = c.forecast(model, data.testX) if mode == 'test' \
             else c.forecast(model, data.valX)
 
-        result.test_mse_list.append(get_mse(data, yhat_oos, mode))
+        mse_val = get_mse(data, yhat_oos, mode)
+        LOGGER.info(f"{c.name} train mse {mse_train} val mse {mse_val}")
+        result.test_mse_list.append(mse_val)
         result.test_mae_list.append(get_mae(data, yhat_oos, mode))
         result.test_mape_list.append(get_mape(data, yhat_oos, mode))
         result.yhat_oos_list.append(yhat_oos)
 
-        feature_scores = get_feature_scores(model, data)
+        if c.pc['poly_degree'] == 0:
+            feature_scores = get_feature_scores(model, data)
+        else:
+            feature_scores = []
         permuted_scores = []#get_permuted_feature_scores(model, data)
         result.feature_scores_list.append(feature_scores)
         result.permuted_scores_list.append(permuted_scores)
@@ -266,6 +272,9 @@ def get_best_config(learner_config_space, preproc_config, mse_scores, results):
     best_result = None
     for k, v in list(reversed(mse_scores.most_common()))[:10]:
         LOGGER.debug("%s:\t%s" % (k, v))
+        # if all predictions are all the same
+        if results[k].yhat_oos[0] == results[k].yhat_oos.mean():
+            continue
         if best_config is None:
             best_config = learner_config_space.Config(dict(k), preproc_config)
             best_result = results[k]
@@ -293,25 +302,21 @@ def run_config_space(pc, learner_config_space, get_val_results, baseline=False):
     best_config, val_result = get_best_config(learner_config_space, pc,
                                                mse_scores, val_results)
 
-    # apply the best parameter config to the test set
-    test_result = run_config([data, best_config, 'test'])
-
-    yhat_oos = data.revert(test_result.yhat_oos, "test", True)
-    yhat_is = data.revert(test_result.yhat_is, "train", True)
+    yhat_is = data.revert(val_result.yhat_is, "train", True)
     yhat_val = data.revert(val_result.yhat_oos, "val", True)
 
-    yhat_oos_list = [data.revert(x, "test", True) for x in test_result.yhat_oos_list]
-    yhat_is_list = [data.revert(x, "train", True) for x in test_result.yhat_is_list]
+    yhat_is_list = [data.revert(x, "train", True) for x in val_result.yhat_is_list]
     yhat_val_list = [data.revert(x, "val", True) for x in val_result.yhat_oos_list]
 
-    LOGGER.info("Best config %s:\t%.3f\t%.3f\t%.3f\t%.3f\t%.3f\t%.3f\t%.3f\t%.3f\t%.3f\t%s" % (
-        best_config.vals, test_result.train_mse, val_result.test_mse,
-        test_result.test_mse, test_result.train_mae, val_result.test_mae,
-        test_result.test_mae, test_result.train_mape, val_result.test_mape,
-        test_result.test_mape, yhat_oos))
+    LOGGER.info("Best config %s:\t%.3f\t%.3f\t%.3f\t%.3f\t%.3f\t%.3f\t%s" % (
+        best_config.vals,
+        val_result.train_mse, val_result.test_mse,
+        val_result.train_mae, val_result.test_mae,
+        val_result.train_mape, val_result.test_mape,
+        yhat_val))
 
     LOGGER.info("Informative features:")
-    for k, v in test_result.feature_scores[:5]:
+    for k, v in val_result.feature_scores[:5]:
         LOGGER.info("%s: %.3f" % (k, v))
 
     return {
@@ -321,62 +326,43 @@ def run_config_space(pc, learner_config_space, get_val_results, baseline=False):
                 'best_learner_config': best_config.vals,
                 'mse': {
                         'train': {
-                            'mean': test_result.train_mse,
-                            'std': test_result.train_mse_std,
-                            'obs': test_result.train_mse_list
+                            'mean': val_result.train_mse,
+                            'std': val_result.train_mse_std,
+                            'obs': val_result.train_mse_list
                             },
                         'val': {
                             'mean': val_result.test_mse,
                             'std': val_result.test_mse_std,
                             'obs': val_result.test_mse_list,
                             },
-                        'test': {
-                            'mean': test_result.test_mse,
-                            'std': test_result.test_mse_std,
-                            'obs': test_result.test_mse_list,
-                            }
                         },
                 'mae': {
                         'train': {
-                            'mean': test_result.train_mae,
-                            'std': test_result.train_mae_std,
-                            'obs': test_result.train_mae_list
+                            'mean': val_result.train_mae,
+                            'std': val_result.train_mae_std,
+                            'obs': val_result.train_mae_list
                             },
                         'val': {
                             'mean': val_result.test_mae,
                             'std': val_result.test_mae_std,
                             'obs': val_result.test_mae_list,
                             },
-                        'test': {
-                            'mean': test_result.test_mae,
-                            'std': test_result.test_mae_std,
-                            'obs': test_result.test_mae_list,
-                            }
                         },
                 'mape': {
                         'train': {
-                            'mean': test_result.train_mape,
-                            'std': test_result.train_mape_std,
-                            'obs': test_result.train_mape_list
+                            'mean': val_result.train_mape,
+                            'std': val_result.train_mape_std,
+                            'obs': val_result.train_mape_list
                             },
                         'val': {
                             'mean': val_result.test_mape,
                             'std': val_result.test_mape_std,
                             'obs': val_result.test_mape_list,
-                            },
-                        'test': {
-                            'mean': test_result.test_mape,
-                            'std': test_result.test_mape_std,
-                            'obs': test_result.test_mape_list,
                             }
                         },
                 'yhat_is': {
                     'mean': yhat_is,
                     'obs': yhat_is_list
-                    },
-                'yhat_oos': {
-                    'mean': yhat_oos,
-                    'obs': yhat_oos_list
                     },
                 'yhat_val': {
                     'mean': yhat_val,
@@ -387,6 +373,6 @@ def run_config_space(pc, learner_config_space, get_val_results, baseline=False):
                                                 'mae': v.test_mae,
                                                 'mape': v.test_mape}}
                                         for x, v in val_results.items()],
-                'feature_scores': test_result.feature_scores,
-                'permuted_scores': test_result.permuted_scores
+                'feature_scores': val_result.feature_scores,
+                'permuted_scores': val_result.permuted_scores
             }

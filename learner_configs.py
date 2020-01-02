@@ -190,7 +190,8 @@ class Config:
             results.append(pred_val)
 
         if first_forecast_error is not None:
-            LOGGER.info(f"{n_forecast_success} successes and {n_forecast_errors} errors during forecasting")
+            LOGGER.info(f"{n_forecast_success} successes and ",
+                f"{n_forecast_errors} errors during forecasting")
             LOGGER.debug(f"First instance with error: {first_forecast_error}")
 
         return np.array(results).reshape(-1, 1)
@@ -223,10 +224,11 @@ class ConfigKernelRidge(Config):
     kernel = "poly"
     degree = 3
     coef0 = 1
+    gamma = None
 
     def init_model(self):
         return KernelRidge(alpha=self.alpha, kernel=self.kernel,
-            degree=self.degree, coef0=self.coef0)
+            degree=self.degree, coef0=self.coef0, gamma=self.gamma)
 
 
 class ConfigKNN(Config):
